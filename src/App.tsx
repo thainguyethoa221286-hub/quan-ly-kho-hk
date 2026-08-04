@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { StoreProvider } from './context/StoreContext';
 import { Navbar } from './components/layout/Navbar';
 import { Sidebar, ActiveModule } from './components/layout/Sidebar';
-import { Module01Store } from './components/modules/Module01Store';
+import StoreModule from './components/modules/StoreModule';
 import { Module02PRPO } from './components/modules/Module02PRPO';
 import { Module03LossDamage } from './components/modules/Module03LossDamage';
 import { Module04Minibar } from './components/modules/Module04Minibar';
@@ -35,7 +35,7 @@ export default function App() {
           <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto bg-[#E4E3E0]">
             <div className="max-w-7xl mx-auto">
               
-              {activeModule === 'MODULE_01_STORE' && <Module01Store />}
+             {activeModule === 'MODULE_01_STORE' && <StoreModule />}
               {activeModule === 'MODULE_02_PRPO' && <Module02PRPO />}
               {activeModule === 'MODULE_03_DAMAGE' && <Module03LossDamage />}
               {activeModule === 'MODULE_04_MINIBAR' && <Module04Minibar />}
