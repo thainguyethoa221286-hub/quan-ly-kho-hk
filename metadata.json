@@ -1,0 +1,6 @@
+{
+  "name": "Hotel Housekeeping & Store Management System",
+  "description": "Enterprise HK Store, Minibar Control, PR-PO Requisition, Loss & Damage Tracking, Office Supplies & Monthly Financial Reports with Excel Export and A4 Printing.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
