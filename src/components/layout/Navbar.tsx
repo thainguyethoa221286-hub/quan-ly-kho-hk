@@ -36,11 +36,8 @@ export const Navbar: React.FC = () => {
             <Building2 className="w-5 h-5" />
           </div>
           <div>
-            <h1 className="font-bold text-base sm:text-lg tracking-tight text-[#141414] flex items-center gap-2">
-              GRAND PALACE
-              <span className="text-[10px] font-mono px-2 py-0.5 uppercase bg-[#E4E3E0] text-[#141414] border border-[#141414]">
-                5★ HOTEL HK & STORE
-              </span>
+            <h1 className="font-bold text-base sm:text-lg tracking-tight text-[#141414]">
+              M HOTEL
             </h1>
             <p className="text-xs text-slate-600 hidden sm:block font-sans">
               Hệ Thống Quản Lý Kho Buồng Phòng, Minibar & Vật Tư
@@ -149,7 +146,7 @@ export const Navbar: React.FC = () => {
           {/* Reset Mock Data */}
           <button
             onClick={() => {
-              if (window.confirm('Bạn có chắc chắn muốn khôi phục dữ liệu mẫu ban đầu của Khách sạn Grand Palace?')) {
+              if (window.confirm('Bạn có chắc chắn muốn khôi phục dữ liệu mẫu ban đầu?')) {
                 resetToDefaults();
               }
             }}
