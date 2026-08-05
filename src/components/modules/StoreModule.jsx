@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Search, Plus, Trash2, Download, Printer, RefreshCw, Loader2, X } from 'lucide-react';
-import * as XLSX from 'xlsx';
+import * as XLSX from 'xlsx-js-style';
 import {
   getKhoData,
   saveKhoItem,
@@ -9,20 +9,17 @@ import {
 } from '../../services/googleSheetsService';
 
 // ---------- Helpers ----------
-const EDITABLE_FIELDS = ['Nhap', 'Transfer', 'SuDung', 'Cost', 'GhiChu'];
-const NUM_FIELDS = ['DauKy', 'SetUp', 'Nhap', 'Transfer', 'HuHongMat', 'SuDung', 'TongXuat', 'CuoiKy', 'Cost', 'ThanhTien'];
-
 function computeDerived(item) {
   const n = (v) => Number(v) || 0;
   const tongXuat = n(item.Nhap) + n(item.Transfer) + n(item.HuHongMat) + n(item.SuDung);
-  const cuoiKy = n(item.DauKy) + n(item.SetUp) + n(item.Nhap) - tongXuat;
+  const tongKho = n(item.Ton) + n(item.SetUp);
   const thanhTien = n(item.SuDung) * n(item.Cost);
-  return { ...item, TongXuat: tongXuat, CuoiKy: cuoiKy, ThanhTien: thanhTien };
+  return { ...item, TongXuat: tongXuat, TongKho: tongKho, ThanhTien: thanhTien };
 }
 
 function nextMonthStr(thang) {
   const [y, m] = thang.split('-').map(Number);
-  const d = new Date(y, m, 1); // m is already next month index (0-based trick)
+  const d = new Date(y, m, 1);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 }
 
@@ -31,7 +28,24 @@ function currentMonthStr() {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 }
 
+function lastDayOfMonthStr(thang) {
+  const [y, m] = thang.split('-').map(Number);
+  const last = new Date(y, m, 0);
+  return `${String(last.getDate()).padStart(2, '0')}/${String(m).padStart(2, '0')}/${y}`;
+}
+function firstDayOfMonthStr(thang) {
+  const [y, m] = thang.split('-').map(Number);
+  return `01/${String(m).padStart(2, '0')}/${y}`;
+}
+
 const fmtNumber = (v) => (Number(v) || 0).toLocaleString('vi-VN');
+
+const EXCEL_HEADERS = [
+  'STT', 'CODE', 'TÊN MẶT HÀNG', 'ĐVT', 'ĐẦU KỲ', 'SET UP', 'NHẬP',
+  'TRANFER', 'HƯ HỎNG/ MẤT', 'SỬ DỤNG', 'TỔNG XUẤT', 'TỒN',
+  'TỔNG KHO', 'ĐƠN GIÁ', 'THÀNH TIỀN', 'GHI CHÚ',
+];
+const COL_COUNT = EXCEL_HEADERS.length; // 16
 
 // ---------- New item form ----------
 function NewItemRow({ onSave, onCancel, nextStt }) {
@@ -45,11 +59,11 @@ function NewItemRow({ onSave, onCancel, nextStt }) {
       <td className="border border-[#141414]/30 px-2 py-1">
         <input className="w-10 bg-transparent text-xs" value={form.Stt} onChange={set('Stt')} />
       </td>
-      <td className="border border-[#141414]/30 px-2 py-1">
-        <input className="w-20 bg-transparent text-xs" placeholder="Mã hàng" value={form.MaHang} onChange={set('MaHang')} />
-      </td>
-      <td className="border border-[#141414]/30 px-2 py-1">
-        <input className="w-full bg-transparent text-xs" placeholder="Tên mặt hàng" value={form.TenHang} onChange={set('TenHang')} />
+      <td className="min-w-[280px] border border-[#141414]/30 px-2 py-1">
+        <div className="flex gap-1">
+          <input className="w-24 bg-transparent text-xs text-slate-500" placeholder="Mã hàng (tuỳ chọn)" value={form.MaHang} onChange={set('MaHang')} />
+          <input className="flex-1 bg-transparent text-xs font-medium" placeholder="Tên mặt hàng" value={form.TenHang} onChange={set('TenHang')} />
+        </div>
       </td>
       <td className="border border-[#141414]/30 px-2 py-1">
         <input className="w-14 bg-transparent text-xs" placeholder="ĐVT" value={form.DVT} onChange={set('DVT')} />
@@ -60,10 +74,9 @@ function NewItemRow({ onSave, onCancel, nextStt }) {
       <td className="border border-[#141414]/30 px-2 py-1">
         <input type="number" className="w-16 bg-transparent text-xs" value={form.SetUp} onChange={set('SetUp')} />
       </td>
-      <td colSpan={4} className="border border-[#141414]/30 px-2 py-1 text-center text-[10px] text-slate-500">
-        Nhập / Transfer / Hư hỏng / Sử dụng — sửa sau khi lưu
+      <td colSpan={5} className="border border-[#141414]/30 px-2 py-1 text-center text-[10px] text-slate-500">
+        Nhập / Transfer / Hư hỏng / Sử dụng / Tồn — sửa sau khi lưu
       </td>
-      <td className="border border-[#141414]/30 px-2 py-1" />
       <td className="border border-[#141414]/30 px-2 py-1" />
       <td className="border border-[#141414]/30 px-2 py-1">
         <input type="number" className="w-20 bg-transparent text-xs" value={form.Cost} onChange={set('Cost')} />
@@ -86,17 +99,73 @@ function NewItemRow({ onSave, onCancel, nextStt }) {
   );
 }
 
+// ---------- Export options modal ----------
+function ExportModal({ defaultFrom, defaultTo, onCancel, onConfirm }) {
+  const [form, setForm] = useState({
+    tuNgay: defaultFrom,
+    denNgay: defaultTo,
+    occ: '',
+    roomNight: '',
+    pax: '',
+  });
+  const set = (field) => (e) => setForm((f) => ({ ...f, [field]: e.target.value }));
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 print:hidden">
+      <div className="w-96 rounded-lg bg-white p-5 shadow-xl">
+        <h3 className="mb-3 text-base font-bold">Thông tin xuất báo cáo Excel</h3>
+        <div className="space-y-3 text-sm">
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="mb-1 block text-xs text-slate-500">Từ ngày</label>
+              <input value={form.tuNgay} onChange={set('tuNgay')} className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm" placeholder="dd/mm/yyyy" />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs text-slate-500">Đến ngày</label>
+              <input value={form.denNgay} onChange={set('denNgay')} className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm" placeholder="dd/mm/yyyy" />
+            </div>
+          </div>
+          <div>
+            <label className="mb-1 block text-xs text-slate-500">OCC (%)</label>
+            <input value={form.occ} onChange={set('occ')} className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm" placeholder="VD: 85.91" />
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="mb-1 block text-xs text-slate-500">Room Night</label>
+              <input value={form.roomNight} onChange={set('roomNight')} className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm" placeholder="VD: 1323" />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs text-slate-500">Pax</label>
+              <input value={form.pax} onChange={set('pax')} className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm" placeholder="VD: 1364" />
+            </div>
+          </div>
+        </div>
+        <div className="mt-4 flex justify-end gap-2">
+          <button onClick={onCancel} className="rounded border border-[#141414] px-3 py-1.5 text-sm">Huỷ</button>
+          <button
+            onClick={() => onConfirm(form)}
+            className="flex items-center gap-1 rounded bg-[#141414] px-3 py-1.5 text-sm font-bold text-white"
+          >
+            <Download className="h-4 w-4" /> Xuất Excel
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ---------- Main component ----------
 export default function StoreModule() {
   const [thang, setThang] = useState(currentMonthStr());
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [savingRows, setSavingRows] = useState({}); // rowIndex -> true
+  const [savingRows, setSavingRows] = useState({});
   const [searchTerm, setSearchTerm] = useState('');
   const [showAddRow, setShowAddRow] = useState(false);
   const [rolloverBusy, setRolloverBusy] = useState(false);
   const [confirmRollover, setConfirmRollover] = useState(false);
+  const [showExportModal, setShowExportModal] = useState(false);
 
   const loadData = useCallback(async (month) => {
     setLoading(true);
@@ -133,6 +202,8 @@ export default function StoreModule() {
       HuHongMat: sum('HuHongMat'),
       SuDung: sum('SuDung'),
       TongXuat: sum('TongXuat'),
+      Ton: sum('Ton'),
+      TongKho: sum('TongKho'),
       ThanhTien: sum('ThanhTien'),
     };
   }, [items]);
@@ -174,7 +245,7 @@ export default function StoreModule() {
 
   const handleAddNew = async (form) => {
     try {
-      const saved = await saveKhoItem(thang, computeDerived({ ...form, Nhap: 0, Transfer: 0, HuHongMat: 0, SuDung: 0, GhiChu: '' }));
+      const saved = await saveKhoItem(thang, computeDerived({ ...form, Nhap: 0, Transfer: 0, HuHongMat: 0, SuDung: 0, Ton: 0, GhiChu: '' }));
       setItems((prev) => [...prev, saved]);
       setShowAddRow(false);
     } catch (err) {
@@ -197,80 +268,141 @@ export default function StoreModule() {
     }
   };
 
-  // ---- Excel export ----
-  const handleExportExcel = () => {
-    const header = [
-      ['M HOTEL SAIGON'],
-      ['BỘ PHẬN HOUSEKEEPING — BÁO CÁO KHO & VẬT TƯ'],
-      [`Tháng: ${thang}`],
-      [],
-      [
-        'STT', 'Mã hàng', 'Tên mặt hàng', 'ĐVT', 'Đầu kỳ', 'Set up', 'Nhập',
-        'Transfer', 'Hư hỏng/mất', 'Sử dụng', 'Tổng xuất', 'Cuối kỳ',
-        'Đơn giá', 'Thành tiền', 'Ghi chú',
-      ],
-    ];
+  // ---- Excel export (khớp mẫu báo cáo thật) ----
+  const runExportExcel = (opts) => {
+    const [y, m] = thang.split('-').map(Number);
+    const grey = 'D9D9D9';
+    const yellow = 'FFF2CC';
+    const red = 'FF0000';
+    const black = '141414';
 
-    const dataRows = items.map((it) => [
-      it.Stt, it.MaHang, it.TenHang, it.DVT, it.DauKy, it.SetUp, it.Nhap,
-      it.Transfer, it.HuHongMat, it.SuDung, it.TongXuat, it.CuoiKy,
-      it.Cost, it.ThanhTien, it.GhiChu,
+    const thinBorder = {
+      top: { style: 'thin', color: { rgb: 'CCCCCC' } },
+      bottom: { style: 'thin', color: { rgb: 'CCCCCC' } },
+      left: { style: 'thin', color: { rgb: 'CCCCCC' } },
+      right: { style: 'thin', color: { rgb: 'CCCCCC' } },
+    };
+
+    const aoa = [];
+    aoa.push([`CHỐT CÁC MẶT HÀNG CUỐI THÁNG ( TỪ NGÀY ${opts.tuNgay} - ${opts.denNgay} )`]);
+    aoa.push([`OCC: ${opts.occ || 0}%       ROOM NIGHT: ${opts.roomNight || 0}       Pax: ${opts.pax || 0}`]);
+    const headerRow = [...EXCEL_HEADERS];
+    headerRow[4] = `ĐẦU KỲ ${String(m).padStart(2, '0')}/${y}`;
+    headerRow[11] = `TỒN ${lastDayOfMonthStr(thang)}`;
+    aoa.push(headerRow);
+    aoa.push(['DANH MỤC VẬT TƯ KHO HK']);
+    const bannerRowIdx = aoa.length - 1;
+
+    const dataStartRow = aoa.length;
+    items.forEach((it) => {
+      aoa.push([
+        it.Stt, it.MaHang, it.TenHang, it.DVT, it.DauKy, it.SetUp, it.Nhap,
+        it.Transfer, it.HuHongMat, it.SuDung, it.TongXuat, it.Ton, it.TongKho,
+        it.Cost, it.ThanhTien, it.GhiChu,
+      ]);
+    });
+    const dataEndRow = aoa.length - 1;
+
+    const totalRowIdx = aoa.length;
+    aoa.push([
+      '', '', 'TỔNG CỘNG', '', '', '', totals.Nhap, totals.Transfer,
+      totals.HuHongMat, totals.SuDung, totals.TongXuat, totals.Ton, totals.TongKho,
+      '', totals.ThanhTien, '',
     ]);
 
-    const totalRow = [
-      '', '', 'TỔNG CỘNG', '', '', '', totals.Nhap, totals.Transfer,
-      totals.HuHongMat, totals.SuDung, totals.TongXuat, '', '', totals.ThanhTien, '',
-    ];
+    aoa.push([]);
+    aoa.push([]);
+    const dateRowIdx = aoa.length;
+    aoa.push([`Ngày ...... Tháng ...... Năm ${y}`]);
+    const sigTitleRowIdx = aoa.length;
+    aoa.push(['THỦ KHO VẬT TƯ', '', '', '', '', 'TRƯỞNG BP BUỒNG PHÒNG', '', '', '', '', 'KẾ TOÁN TRƯỞNG']);
+    const sigSubRowIdx = aoa.length;
+    aoa.push(['(Ký & ghi rõ họ tên)', '', '', '', '', '(Ký & ghi rõ họ tên)', '', '', '', '', '(Ký & ghi rõ họ tên)']);
 
-    const signatureRows = [
-      [],
-      [],
-      ['Thủ kho', '', '', '', '', 'Trưởng bộ phận HK', '', '', '', '', 'Kế toán'],
-      ['(Ký, ghi rõ họ tên)', '', '', '', '', '(Ký, ghi rõ họ tên)', '', '', '', '', '(Ký, ghi rõ họ tên)'],
-    ];
-
-    const aoa = [...header, ...dataRows, totalRow, ...signatureRows];
     const ws = XLSX.utils.aoa_to_sheet(aoa);
+    const lastCol = COL_COUNT - 1;
 
-    // Merge title rows
     ws['!merges'] = [
-      { s: { r: 0, c: 0 }, e: { r: 0, c: 14 } },
-      { s: { r: 1, c: 0 }, e: { r: 1, c: 14 } },
-      { s: { r: 2, c: 0 }, e: { r: 2, c: 14 } },
+      { s: { r: 0, c: 0 }, e: { r: 0, c: lastCol } },
+      { s: { r: 1, c: 0 }, e: { r: 1, c: lastCol } },
+      { s: { r: bannerRowIdx, c: 0 }, e: { r: bannerRowIdx, c: lastCol } },
+      { s: { r: dateRowIdx, c: 0 }, e: { r: dateRowIdx, c: lastCol } },
+      { s: { r: sigTitleRowIdx, c: 0 }, e: { r: sigTitleRowIdx, c: 4 } },
+      { s: { r: sigTitleRowIdx, c: 5 }, e: { r: sigTitleRowIdx, c: 9 } },
+      { s: { r: sigTitleRowIdx, c: 10 }, e: { r: sigTitleRowIdx, c: 15 } },
+      { s: { r: sigSubRowIdx, c: 0 }, e: { r: sigSubRowIdx, c: 4 } },
+      { s: { r: sigSubRowIdx, c: 5 }, e: { r: sigSubRowIdx, c: 9 } },
+      { s: { r: sigSubRowIdx, c: 10 }, e: { r: sigSubRowIdx, c: 15 } },
     ];
 
-    // Column widths
     ws['!cols'] = [
-      { wch: 5 }, { wch: 12 }, { wch: 30 }, { wch: 8 }, { wch: 9 }, { wch: 8 },
-      { wch: 8 }, { wch: 9 }, { wch: 11 }, { wch: 9 }, { wch: 10 }, { wch: 9 },
-      { wch: 12 }, { wch: 14 }, { wch: 18 },
+      { wch: 5 }, { wch: 12 }, { wch: 30 }, { wch: 7 }, { wch: 10 }, { wch: 8 },
+      { wch: 8 }, { wch: 9 }, { wch: 11 }, { wch: 9 }, { wch: 10 }, { wch: 10 },
+      { wch: 10 }, { wch: 12 }, { wch: 14 }, { wch: 18 },
     ];
 
-    // Currency format for Cost (col N=index12) and ThanhTien (col O=index13)
-    const dataStartRow = header.length; // 0-indexed row where data begins
-    for (let i = 0; i < dataRows.length; i++) {
-      const r = dataStartRow + i;
-      ['M', 'N'].forEach((colLetter, ci) => {
-        const colIdx = 12 + ci; // Cost=12, ThanhTien=13
-        const cellRef = XLSX.utils.encode_cell({ r, c: colIdx });
-        if (ws[cellRef]) ws[cellRef].z = '#,##0';
+    const setCellStyle = (r, c, style) => {
+      const ref = XLSX.utils.encode_cell({ r, c });
+      if (!ws[ref]) ws[ref] = { t: 's', v: '' };
+      ws[ref].s = { ...(ws[ref].s || {}), ...style };
+    };
+
+    setCellStyle(0, 0, { font: { bold: true, sz: 14, name: 'Times New Roman' }, alignment: { horizontal: 'center', vertical: 'center' } });
+    setCellStyle(1, 0, { font: { bold: true, sz: 11, name: 'Times New Roman' }, alignment: { horizontal: 'center' } });
+
+    // Header row — SET UP (c=5) và TỒN (c=11) chữ đỏ
+    for (let c = 0; c < COL_COUNT; c++) {
+      const isRed = c === 5 || c === 11;
+      setCellStyle(2, c, {
+        font: { bold: true, sz: 10, color: { rgb: isRed ? red : black }, name: 'Times New Roman' },
+        fill: { fgColor: { rgb: grey } },
+        alignment: { horizontal: 'center', vertical: 'center', wrapText: true },
+        border: thinBorder,
       });
     }
-    // Format totals row currency cells too
-    const totalRowIdx = dataStartRow + dataRows.length;
-    [6, 7, 8, 9, 10, 13].forEach((c) => {
-      const cellRef = XLSX.utils.encode_cell({ r: totalRowIdx, c });
-      if (ws[cellRef]) ws[cellRef].z = '#,##0';
+
+    setCellStyle(bannerRowIdx, 0, {
+      font: { bold: true, sz: 10, color: { rgb: red }, name: 'Times New Roman' },
+      fill: { fgColor: { rgb: yellow } },
+      alignment: { horizontal: 'left', vertical: 'center' },
     });
+
+    for (let r = dataStartRow; r <= dataEndRow; r++) {
+      for (let c = 0; c < COL_COUNT; c++) {
+        const isRed = c === 5 || c === 11;
+        const isNum = [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14].includes(c);
+        setCellStyle(r, c, {
+          font: { sz: 10, color: { rgb: isRed ? red : black }, name: 'Times New Roman' },
+          alignment: { horizontal: isNum ? 'right' : 'left', vertical: 'center' },
+          border: thinBorder,
+          ...(c === 13 || c === 14 ? { numFmt: '#,##0' } : {}),
+        });
+      }
+    }
+
+    for (let c = 0; c < COL_COUNT; c++) {
+      setCellStyle(totalRowIdx, c, {
+        font: { bold: true, sz: 10, name: 'Times New Roman' },
+        fill: { fgColor: { rgb: 'F2F2F2' } },
+        border: thinBorder,
+        ...(c === 13 || c === 14 ? { numFmt: '#,##0' } : {}),
+      });
+    }
+
+    [0, 5, 10].forEach((c) => {
+      setCellStyle(sigTitleRowIdx, c, { font: { bold: true, sz: 11, name: 'Times New Roman' }, alignment: { horizontal: 'center' } });
+      setCellStyle(sigSubRowIdx, c, { font: { italic: true, sz: 9, name: 'Times New Roman' }, alignment: { horizontal: 'center' } });
+    });
+    setCellStyle(dateRowIdx, 0, { font: { italic: true, sz: 10, name: 'Times New Roman' }, alignment: { horizontal: 'right' } });
 
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, `Kho_${thang}`);
     XLSX.writeFile(wb, `Bao_Cao_Kho_${thang}.xlsx`);
+    setShowExportModal(false);
   };
 
   return (
     <div>
-      {/* Print-only CSS */}
       <style>{`
         @media print {
           @page { size: A4 landscape; margin: 10mm; }
@@ -297,7 +429,7 @@ export default function StoreModule() {
             <Plus className="h-3.5 w-3.5" /> Thêm mặt hàng
           </button>
           <button
-            onClick={handleExportExcel}
+            onClick={() => setShowExportModal(true)}
             className="flex items-center gap-1 rounded bg-[#141414] px-3 py-1.5 text-xs font-bold text-white hover:bg-slate-800"
           >
             <Download className="h-3.5 w-3.5" /> Xuất Excel
@@ -324,9 +456,8 @@ export default function StoreModule() {
         </div>
       )}
 
-      {/* ---- Print header (only visible when printing) ---- */}
       <div className="hidden print:block print:mb-4 print:text-center">
-        <div className="text-lg font-bold">M HOTEL SAIGON</div>
+        <div className="text-lg font-bold">M HOTEL</div>
         <div className="text-sm">BỘ PHẬN HOUSEKEEPING — BÁO CÁO KHO & VẬT TƯ — Tháng {thang}</div>
       </div>
 
@@ -335,9 +466,14 @@ export default function StoreModule() {
         <table className="w-full border-collapse text-xs">
           <thead className="bg-[#F2F1EE] font-mono uppercase text-[10px] text-[#141414]">
             <tr>
-              {['STT', 'Mã hàng', 'Tên mặt hàng', 'ĐVT', 'Đầu kỳ', 'Set up', 'Nhập', 'Transfer',
-                'Hư hỏng/mất', 'Sử dụng', 'Tổng xuất', 'Cuối kỳ', 'Đơn giá', 'Thành tiền', 'Ghi chú', ''].map((h) => (
-                <th key={h} className="border border-[#141414]/30 px-2 py-2 text-left">{h}</th>
+              {['STT', 'Tên mặt hàng', 'ĐVT', 'Đầu kỳ', 'Set up', 'Nhập', 'Transfer',
+                'Hư hỏng/mất', 'Sử dụng', 'Tổng xuất', 'Tồn', 'Tổng Kho', 'Đơn giá', 'Thành tiền', 'Ghi chú', ''].map((h, i) => (
+                <th
+                  key={h + i}
+                  className={`border border-[#141414]/30 px-2 py-2 text-left ${i === 1 ? 'min-w-[280px]' : ''}`}
+                >
+                  {h}
+                </th>
               ))}
             </tr>
           </thead>
@@ -356,13 +492,13 @@ export default function StoreModule() {
               filteredItems.map((it) => (
                 <tr key={it.rowIndex} className={savingRows[it.rowIndex] ? 'opacity-50' : ''}>
                   <td className="border border-[#141414]/30 px-2 py-1">{it.Stt}</td>
-                  <td className="border border-[#141414]/30 px-2 py-1">{it.MaHang}</td>
-                  <td className="border border-[#141414]/30 px-2 py-1 font-medium">{it.TenHang}</td>
+                  <td className="min-w-[280px] border border-[#141414]/30 px-2 py-1 font-medium" title={it.MaHang ? `Mã: ${it.MaHang}` : undefined}>
+                    {it.TenHang}
+                  </td>
                   <td className="border border-[#141414]/30 px-2 py-1">{it.DVT}</td>
                   <td className="border border-[#141414]/30 px-2 py-1 text-right">{fmtNumber(it.DauKy)}</td>
                   <td className="border border-[#141414]/30 px-2 py-1 text-right">{fmtNumber(it.SetUp)}</td>
 
-                  {/* Editable: Nhap */}
                   <td className="border border-[#141414]/30 p-0">
                     <input
                       type="number"
@@ -372,7 +508,6 @@ export default function StoreModule() {
                       className="w-16 bg-transparent px-2 py-1 text-right focus:bg-yellow-50 focus:outline-none"
                     />
                   </td>
-                  {/* Editable: Transfer */}
                   <td className="border border-[#141414]/30 p-0">
                     <input
                       type="number"
@@ -382,11 +517,9 @@ export default function StoreModule() {
                       className="w-16 bg-transparent px-2 py-1 text-right focus:bg-yellow-50 focus:outline-none"
                     />
                   </td>
-                  {/* Read-only: HuHongMat (đồng bộ tự động từ Module Hư Hỏng sau này) */}
                   <td className="border border-[#141414]/30 px-2 py-1 text-right text-slate-500" title="Tự động đồng bộ từ Module Hư Hỏng & Thiệt Hại">
                     {fmtNumber(it.HuHongMat)}
                   </td>
-                  {/* Editable: SuDung */}
                   <td className="border border-[#141414]/30 p-0">
                     <input
                       type="number"
@@ -398,9 +531,20 @@ export default function StoreModule() {
                   </td>
 
                   <td className="border border-[#141414]/30 px-2 py-1 text-right font-semibold">{fmtNumber(it.TongXuat)}</td>
-                  <td className="border border-[#141414]/30 px-2 py-1 text-right font-semibold">{fmtNumber(it.CuoiKy)}</td>
 
-                  {/* Editable: Cost */}
+                  {/* Editable: Ton (nhập tay, kiểm kê thực tế) */}
+                  <td className="border border-[#141414]/30 p-0 bg-red-50/40">
+                    <input
+                      type="number"
+                      value={it.Ton}
+                      onChange={(e) => handleFieldChange(it.rowIndex, 'Ton', e.target.value)}
+                      onBlur={() => handleFieldBlur(it.rowIndex)}
+                      className="w-16 bg-transparent px-2 py-1 text-right font-semibold text-red-600 focus:bg-yellow-50 focus:outline-none"
+                    />
+                  </td>
+
+                  <td className="border border-[#141414]/30 px-2 py-1 text-right font-semibold">{fmtNumber(it.TongKho)}</td>
+
                   <td className="border border-[#141414]/30 p-0">
                     <input
                       type="number"
@@ -413,7 +557,6 @@ export default function StoreModule() {
 
                   <td className="border border-[#141414]/30 px-2 py-1 text-right">{fmtNumber(it.ThanhTien)}</td>
 
-                  {/* Editable: GhiChu */}
                   <td className="border border-[#141414]/30 p-0">
                     <input
                       value={it.GhiChu || ''}
@@ -443,13 +586,14 @@ export default function StoreModule() {
           {items.length > 0 && (
             <tfoot className="bg-[#F2F1EE] font-bold">
               <tr>
-                <td colSpan={6} className="border border-[#141414]/30 px-2 py-2">TỔNG CỘNG</td>
+                <td colSpan={5} className="border border-[#141414]/30 px-2 py-2">TỔNG CỘNG</td>
                 <td className="border border-[#141414]/30 px-2 py-2 text-right">{fmtNumber(totals.Nhap)}</td>
                 <td className="border border-[#141414]/30 px-2 py-2 text-right">{fmtNumber(totals.Transfer)}</td>
                 <td className="border border-[#141414]/30 px-2 py-2 text-right">{fmtNumber(totals.HuHongMat)}</td>
                 <td className="border border-[#141414]/30 px-2 py-2 text-right">{fmtNumber(totals.SuDung)}</td>
                 <td className="border border-[#141414]/30 px-2 py-2 text-right">{fmtNumber(totals.TongXuat)}</td>
-                <td className="border border-[#141414]/30 px-2 py-2" />
+                <td className="border border-[#141414]/30 px-2 py-2 text-right">{fmtNumber(totals.Ton)}</td>
+                <td className="border border-[#141414]/30 px-2 py-2 text-right">{fmtNumber(totals.TongKho)}</td>
                 <td className="border border-[#141414]/30 px-2 py-2" />
                 <td className="border border-[#141414]/30 px-2 py-2 text-right">{fmtNumber(totals.ThanhTien)}</td>
                 <td className="border border-[#141414]/30 px-2 py-2" colSpan={2} />
@@ -459,32 +603,39 @@ export default function StoreModule() {
         </table>
       </div>
 
-      {/* Print-only signature block */}
       <div className="mt-10 hidden grid-cols-3 gap-4 text-center text-sm print:grid">
         <div>
-          <p className="font-bold">Thủ kho</p>
-          <p className="text-xs text-slate-500">(Ký, ghi rõ họ tên)</p>
+          <p className="font-bold">Thủ Kho Vật Tư</p>
+          <p className="text-xs text-slate-500">(Ký & ghi rõ họ tên)</p>
         </div>
         <div>
-          <p className="font-bold">Trưởng bộ phận HK</p>
-          <p className="text-xs text-slate-500">(Ký, ghi rõ họ tên)</p>
+          <p className="font-bold">Trưởng BP Buồng Phòng</p>
+          <p className="text-xs text-slate-500">(Ký & ghi rõ họ tên)</p>
         </div>
         <div>
-          <p className="font-bold">Kế toán</p>
-          <p className="text-xs text-slate-500">(Ký, ghi rõ họ tên)</p>
+          <p className="font-bold">Kế Toán Trưởng</p>
+          <p className="text-xs text-slate-500">(Ký & ghi rõ họ tên)</p>
         </div>
       </div>
 
-      {/* ---- Rollover confirm modal ---- */}
+      {showExportModal && (
+        <ExportModal
+          defaultFrom={firstDayOfMonthStr(thang)}
+          defaultTo={lastDayOfMonthStr(thang)}
+          onCancel={() => setShowExportModal(false)}
+          onConfirm={runExportExcel}
+        />
+      )}
+
       {confirmRollover && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 print:hidden">
           <div className="w-96 rounded-lg bg-white p-5 shadow-xl">
             <h3 className="mb-2 text-base font-bold">Xác nhận kết chuyển tháng</h3>
             <p className="mb-4 text-sm text-slate-600">
-              Toàn bộ <strong>Cuối kỳ</strong> của tháng <strong>{thang}</strong> sẽ trở thành{' '}
-              <strong>Đầu kỳ</strong> của tháng <strong>{nextMonthStr(thang)}</strong>. Các cột Nhập,
-              Transfer, Hư hỏng/mất, Sử dụng của tháng mới sẽ được reset về 0. Thao tác này không
-              thể hoàn tác.
+              Toàn bộ <strong>Tồn</strong> (số bạn đã nhập tay) của tháng <strong>{thang}</strong> sẽ trở
+              thành <strong>Đầu kỳ</strong> của tháng <strong>{nextMonthStr(thang)}</strong>. Các cột Nhập,
+              Transfer, Hư hỏng/mất, Sử dụng, Tồn của tháng mới sẽ được reset về 0 (bạn sẽ nhập lại
+              Tồn sau khi kiểm kê cuối tháng mới). Thao tác này không thể hoàn tác.
             </p>
             <div className="flex justify-end gap-2">
               <button
