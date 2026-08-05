@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Search, Plus, Trash2, Download, Printer, RefreshCw, Loader2, X } from 'lucide-react';
 import * as XLSX from 'xlsx-js-style';
+import { useStore } from '../../context/StoreContext';
 import {
   getKhoData,
   saveKhoItem,
@@ -156,7 +157,9 @@ function ExportModal({ defaultFrom, defaultTo, onCancel, onConfirm }) {
 
 // ---------- Main component ----------
 export default function StoreModule() {
-  const [thang, setThang] = useState(currentMonthStr());
+  const { selectedMonth, setSelectedMonth } = useStore();
+  const thang = selectedMonth;
+  const setThang = setSelectedMonth;
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
