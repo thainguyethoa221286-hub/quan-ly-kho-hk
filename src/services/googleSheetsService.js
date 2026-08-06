@@ -125,3 +125,51 @@ export function saveDamageItem(thang, item) {
 export function deleteDamageItem(thang, rowIndex) {
   return jsonpRequest({ action: 'deleteDamageItem', thang, rowIndex });
 }
+
+/** ===== Module 04: Quản Lý Minibar ===== */
+
+// -- Danh mục Item Minibar --
+export function getMinibarCatalog() {
+  return jsonpRequest({ action: 'getMinibarCatalog' }, 30000);
+}
+export function saveMinibarCatalogItem(item) {
+  return jsonpRequest({ action: 'saveMinibarCatalogItem', item: JSON.stringify(item) });
+}
+
+// -- Sub 4B: Ma trận Setup theo Tầng --
+export function getMinibarSetup() {
+  return jsonpRequest({ action: 'getMinibarSetup' }, 30000);
+}
+export function saveMinibarSetupItem(item) {
+  return jsonpRequest({ action: 'saveMinibarSetupItem', item: JSON.stringify(item) });
+}
+
+// -- Bảng F&B / FO (theo tháng) --
+export function getMinibarFBFO(thang) {
+  return jsonpRequest({ action: 'getMinibarFBFO', thang }, 30000);
+}
+export function saveMinibarFBFOItem(thang, item) {
+  return jsonpRequest({ action: 'saveMinibarFBFOItem', thang, item: JSON.stringify(item) });
+}
+
+// -- Sub 4A: Daily Bills --
+export function getMinibarBills(thang) {
+  return jsonpRequest({ action: 'getMinibarBills', thang }, 30000);
+}
+export function saveMinibarBill(thang, bill) {
+  return jsonpRequest({ action: 'saveMinibarBill', thang, bill: JSON.stringify(bill) });
+}
+export function deleteMinibarBill(thang, billId) {
+  return jsonpRequest({ action: 'deleteMinibarBill', thang, billId });
+}
+
+// -- Sub 4C: Bảng Báo Cáo Tổng --
+export function getMinibarSummary(thang) {
+  return jsonpRequest({ action: 'getMinibarSummary', thang }, 30000);
+}
+export function saveMinibarSummaryItem(thang, item) {
+  return jsonpRequest({ action: 'saveMinibarSummaryItem', thang, item: JSON.stringify(item) });
+}
+export function rolloverMinibarMonth(fromThang, toThang) {
+  return jsonpRequest({ action: 'rolloverMinibarMonth', fromThang, toThang }, 60000);
+}
