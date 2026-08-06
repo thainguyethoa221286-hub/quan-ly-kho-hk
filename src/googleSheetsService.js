@@ -81,3 +81,25 @@ export function listAvailableMonths() {
 export function rolloverMonth(fromThang, toThang) {
   return jsonpRequest({ action: 'rolloverMonth', fromThang, toThang }, 60000);
 }
+
+/** ===== Module 02: Đề Xuất Mua Hàng PR-PO ===== */
+
+/** Lấy danh sách PR-PO của 1 tháng (tự đồng bộ mặt hàng mới + StockInHand sống từ Module 01) */
+export function getPRPOData(thang) {
+  return jsonpRequest({ action: 'getPRPO', thang }, 30000);
+}
+
+/** Lưu 1 dòng PR-PO (StockMax, QTY, GhiChu) */
+export function savePRPOItem(thang, item) {
+  return jsonpRequest({ action: 'savePRPO', thang, item: JSON.stringify(item) });
+}
+
+/** Xoá 1 dòng PR-PO */
+export function deletePRPOItem(thang, rowIndex) {
+  return jsonpRequest({ action: 'deletePRPO', thang, rowIndex });
+}
+
+/** Tự động tính lại PR: gán QTY = Đề Xuất Mua cho toàn bộ danh sách */
+export function recalcPRPO(thang) {
+  return jsonpRequest({ action: 'recalcPRPO', thang }, 30000);
+}
