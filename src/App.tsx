@@ -5,7 +5,7 @@ import { Sidebar, ActiveModule } from './components/layout/Sidebar';
 import StoreModule from './components/modules/StoreModule';
 import PRPOModule from './components/modules/PRPOModule';
 import LossDamageModule from './components/modules/LossDamageModule';
-import { Module04Minibar } from './components/modules/Module04Minibar';
+import MinibarModule from './components/modules/MinibarModule';
 import { Module05OfficeSupplies } from './components/modules/Module05OfficeSupplies';
 import { Module06Dashboard } from './components/modules/Module06Dashboard';
 
@@ -38,7 +38,7 @@ export default function App() {
              {activeModule === 'MODULE_01_STORE' && <StoreModule />}
               {activeModule === 'MODULE_02_PRPO' && <PRPOModule />}
               {activeModule === 'MODULE_03_DAMAGE' && <LossDamageModule />}
-              {activeModule === 'MODULE_04_MINIBAR' && <Module04Minibar />}
+              {activeModule === 'MODULE_04_MINIBAR' && <MinibarModule />}
               {activeModule === 'MODULE_05_VPP' && <Module05OfficeSupplies />}
               {activeModule === 'MODULE_06_DASHBOARD' && <Module06Dashboard />}
 
