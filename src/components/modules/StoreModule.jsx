@@ -75,14 +75,9 @@ function NewItemRow({ onSave, onCancel, nextStt }) {
       <td className="border border-[#141414]/30 px-2 py-1">
         <input type="number" className="w-16 bg-transparent text-xs" value={form.SetUp} onChange={set('SetUp')} />
       </td>
-      <td colSpan={5} className="border border-[#141414]/30 px-2 py-1 text-center text-[10px] text-slate-500">
-        Nhập / Transfer / Hư hỏng / Sử dụng / Tồn — sửa sau khi lưu
+      <td colSpan={7} className="border border-[#141414]/30 px-2 py-1 text-center text-[10px] text-slate-500">
+        Nhập / Transfer / Hư hỏng / Sử dụng / Tổng xuất / Tồn / Tổng kho — sửa sau khi lưu
       </td>
-      <td className="border border-[#141414]/30 px-2 py-1" />
-      <td className="border border-[#141414]/30 px-2 py-1">
-        <input type="number" className="w-20 bg-transparent text-xs" value={form.Cost} onChange={set('Cost')} />
-      </td>
-      <td className="border border-[#141414]/30 px-2 py-1" />
       <td className="border border-[#141414]/30 px-2 py-1" />
       <td className="border border-[#141414]/30 px-2 py-1 whitespace-nowrap">
         <button
@@ -410,6 +405,15 @@ export default function StoreModule() {
         @media print {
           @page { size: A4 landscape; margin: 10mm; }
         }
+        input[type=number]::-webkit-outer-spin-button,
+        input[type=number]::-webkit-inner-spin-button {
+          -webkit-appearance: none;
+          margin: 0;
+        }
+        input[type=number] {
+          -moz-appearance: textfield;
+          appearance: textfield;
+        }
       `}</style>
 
       {/* ---- Toolbar ---- */}
@@ -470,7 +474,7 @@ export default function StoreModule() {
           <thead className="bg-[#F2F1EE] font-mono uppercase text-[10px] text-[#141414]">
             <tr>
               {['STT', 'Tên mặt hàng', 'ĐVT', 'Đầu kỳ', 'Set up', 'Nhập', 'Transfer',
-                'Hư hỏng/mất', 'Sử dụng', 'Tổng xuất', 'Tồn', 'Tổng Kho', 'Đơn giá', 'Thành tiền', 'Ghi chú', ''].map((h, i) => (
+                'Hư hỏng/mất', 'Sử dụng', 'Tổng xuất', 'Tồn/Cuối kỳ', 'Tổng Kho', 'Ghi chú', ''].map((h, i) => (
                 <th
                   key={h + i}
                   className={`border border-[#141414]/30 px-2 py-2 text-left ${i === 1 ? 'min-w-[280px]' : ''}`}
@@ -483,13 +487,13 @@ export default function StoreModule() {
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={16} className="py-8 text-center text-slate-400">
+                <td colSpan={14} className="py-8 text-center text-slate-400">
                   <Loader2 className="mx-auto h-5 w-5 animate-spin" /> Đang tải dữ liệu...
                 </td>
               </tr>
             ) : filteredItems.length === 0 ? (
               <tr>
-                <td colSpan={16} className="py-8 text-center text-slate-400">Chưa có dữ liệu.</td>
+                <td colSpan={14} className="py-8 text-center text-slate-400">Chưa có dữ liệu.</td>
               </tr>
             ) : (
               filteredItems.map((it) => (
@@ -550,18 +554,6 @@ export default function StoreModule() {
 
                   <td className="border border-[#141414]/30 p-0">
                     <input
-                      type="number"
-                      value={it.Cost}
-                      onChange={(e) => handleFieldChange(it.rowIndex, 'Cost', e.target.value)}
-                      onBlur={() => handleFieldBlur(it.rowIndex)}
-                      className="w-20 bg-transparent px-2 py-1 text-right focus:bg-yellow-50 focus:outline-none"
-                    />
-                  </td>
-
-                  <td className="border border-[#141414]/30 px-2 py-1 text-right">{fmtNumber(it.ThanhTien)}</td>
-
-                  <td className="border border-[#141414]/30 p-0">
-                    <input
                       value={it.GhiChu || ''}
                       onChange={(e) => handleFieldChange(it.rowIndex, 'GhiChu', e.target.value)}
                       onBlur={() => handleFieldBlur(it.rowIndex)}
@@ -597,8 +589,6 @@ export default function StoreModule() {
                 <td className="border border-[#141414]/30 px-2 py-2 text-right">{fmtNumber(totals.TongXuat)}</td>
                 <td className="border border-[#141414]/30 px-2 py-2 text-right">{fmtNumber(totals.Ton)}</td>
                 <td className="border border-[#141414]/30 px-2 py-2 text-right">{fmtNumber(totals.TongKho)}</td>
-                <td className="border border-[#141414]/30 px-2 py-2" />
-                <td className="border border-[#141414]/30 px-2 py-2 text-right">{fmtNumber(totals.ThanhTien)}</td>
                 <td className="border border-[#141414]/30 px-2 py-2" colSpan={2} />
               </tr>
             </tfoot>
