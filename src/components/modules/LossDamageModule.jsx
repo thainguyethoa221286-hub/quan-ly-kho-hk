@@ -11,7 +11,35 @@ import {
 
 const GROUPS = ['Amenities', 'CCDC', 'Linen', 'Minibar', 'Hút thuốc', 'Khác'];
 const fmtNumber = (v) => (Number(v) || 0).toLocaleString('vi-VN');
-const todayISO = () => new Date().toISOString().slice(0, 10);
+
+// Lấy ngày hôm nay theo GIỜ ĐỊA PHƯƠNG (không dùng toISOString() vì nó quy
+// đổi sang UTC, dễ bị lùi lại 1 ngày vào buổi tối/đêm ở múi giờ Việt Nam).
+const todayISO = () => {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+};
+
+// Hiển thị ngày lưu dạng "YYYY-MM-DD" thành "DD/MM/YYYY" cho dễ đọc
+const fmtDateDisplay = (iso) => {
+  if (!iso) return '';
+  const parts = String(iso).split('-');
+  if (parts.length !== 3) return iso;
+  const [y, m, d] = parts;
+  return `${d}/${m}/${y}`;
+};
+
+// Cho phép gõ số tiền có dấu chấm HOẶC phẩy làm ngăn cách hàng nghìn
+// (VD: "10.000" hoặc "10,000" đều hiểu là 10000) — không dùng type="number"
+// vì trình duyệt hiểu dấu chấm là số thập phân, gây sai số.
+const parseAmount = (str) => {
+  if (str === null || str === undefined || str === '') return 0;
+  const cleaned = String(str).replace(/[.,\s]/g, '');
+  const num = parseInt(cleaned, 10);
+  return isNaN(num) ? 0 : num;
+};
 
 // ---------- Modal: Ghi Nhận Báo Cáo Hư Hỏng / FOC ----------
 function AddDamageModal({ catalog, onCancel, onConfirm }) {
@@ -126,7 +154,13 @@ function AddDamageModal({ catalog, onCancel, onConfirm }) {
           <label className="mb-1 block text-xs text-slate-500">
             {form.HinhThuc === 'CHARGE' ? 'Số Tiền Thu Khách (VNĐ)' : 'Số Tiền KS Chịu FOC (VNĐ)'}
           </label>
-          <input type="number" value={form.SoTien} onChange={set('SoTien')} placeholder="0" className="w-full rounded border border-slate-300 px-2 py-2 text-sm focus:outline-none" />
+          <input
+            value={form.SoTien}
+            onChange={set('SoTien')}
+            placeholder="VD: 10.000 hoặc 10000"
+            inputMode="numeric"
+            className="w-full rounded border border-slate-300 px-2 py-2 text-sm focus:outline-none"
+          />
         </div>
 
         <div className="mt-4">
@@ -205,8 +239,8 @@ export default function LossDamageModule() {
         ViTri: form.ViTri,
         SL: Number(form.SL) || 0,
         HinhThuc: form.HinhThuc,
-        ThuKhach: form.HinhThuc === 'CHARGE' ? Number(form.SoTien) || 0 : 0,
-        FOCCost: form.HinhThuc === 'FOC' ? Number(form.SoTien) || 0 : 0,
+        ThuKhach: form.HinhThuc === 'CHARGE' ? parseAmount(form.SoTien) : 0,
+        FOCCost: form.HinhThuc === 'FOC' ? parseAmount(form.SoTien) : 0,
         NguoiBaoCao: form.NguoiBaoCao,
         GhiChu: form.GhiChu,
       };
@@ -262,7 +296,7 @@ export default function LossDamageModule() {
       left: { style: 'thin', color: { rgb: 'CCCCCC' } },
       right: { style: 'thin', color: { rgb: 'CCCCCC' } },
     };
-    const headers = ['STT', 'ITEMS', 'QUANTITY', 'CHARGE', 'NO CHARGE', 'OFFER BY', 'NOTE'];
+    const headers = ['STT', 'NGÀY', 'ITEMS', 'QUANTITY', 'CHARGE', 'NO CHARGE', 'OFFER BY', 'NOTE'];
 
     const aoa = [];
     aoa.push([`Damage & Breakage   ${monthLabels[m - 1]}-${y}`]);
@@ -278,20 +312,20 @@ export default function LossDamageModule() {
       aoa.push([group.toUpperCase()]);
       const startRow = aoa.length;
       groupItems.forEach((it, idx) => {
-        aoa.push([idx + 1, it.TenHang, it.SL, it.ThuKhach || '', it.FOCCost || '', it.NguoiBaoCao, it.GhiChu]);
+        aoa.push([idx + 1, fmtDateDisplay(it.Ngay), it.TenHang, it.SL, it.ThuKhach || '', it.FOCCost || '', it.NguoiBaoCao, it.GhiChu]);
       });
       dataRowRange.push([startRow, aoa.length - 1]);
     });
 
     const totalRowIdx = aoa.length;
-    aoa.push(['', 'TỔNG CỘNG', '', totals.sumCharge, totals.sumFOC, '', '']);
+    aoa.push(['', '', 'TỔNG CỘNG', '', totals.sumCharge, totals.sumFOC, '', '']);
 
     const ws = XLSX.utils.aoa_to_sheet(aoa);
     const lastCol = headers.length - 1;
     const merges = [{ s: { r: 0, c: 0 }, e: { r: 0, c: lastCol } }];
     bannerRows.forEach((r) => merges.push({ s: { r, c: 0 }, e: { r, c: lastCol } }));
     ws['!merges'] = merges;
-    ws['!cols'] = [{ wch: 5 }, { wch: 30 }, { wch: 10 }, { wch: 12 }, { wch: 12 }, { wch: 18 }, { wch: 26 }];
+    ws['!cols'] = [{ wch: 5 }, { wch: 11 }, { wch: 30 }, { wch: 10 }, { wch: 12 }, { wch: 12 }, { wch: 18 }, { wch: 26 }];
 
     const setStyle = (r, c, style) => {
       const ref = XLSX.utils.encode_cell({ r, c });
@@ -318,12 +352,12 @@ export default function LossDamageModule() {
     dataRowRange.forEach(([start, end]) => {
       for (let r = start; r <= end; r++) {
         for (let c = 0; c < headers.length; c++) {
-          const isNum = [2, 3, 4].includes(c);
+          const isNum = [3, 4, 5].includes(c);
           setStyle(r, c, {
             font: { sz: 10, name: 'Times New Roman' },
             alignment: { horizontal: isNum ? 'right' : 'left', vertical: 'center' },
             border: thinBorder,
-            ...(c === 3 || c === 4 ? { numFmt: '#,##0' } : {}),
+            ...(c === 4 || c === 5 ? { numFmt: '#,##0' } : {}),
           });
         }
       }
@@ -333,7 +367,7 @@ export default function LossDamageModule() {
         font: { bold: true, sz: 10, name: 'Times New Roman' },
         fill: { fgColor: { rgb: 'F2F2F2' } },
         border: thinBorder,
-        ...(c === 3 || c === 4 ? { numFmt: '#,##0' } : {}),
+        ...(c === 4 || c === 5 ? { numFmt: '#,##0' } : {}),
       });
     }
 
@@ -431,7 +465,7 @@ export default function LossDamageModule() {
               items.map((it) => (
                 <tr key={it.rowIndex} className={savingRows[it.rowIndex] ? 'opacity-50' : ''}>
                   <td className="border border-[#141414]/30 px-2 py-1">{it.Stt}</td>
-                  <td className="border border-[#141414]/30 px-2 py-1 whitespace-nowrap">{it.Ngay}</td>
+                  <td className="border border-[#141414]/30 px-2 py-1 whitespace-nowrap">{fmtDateDisplay(it.Ngay)}</td>
                   <td className="min-w-[220px] border border-[#141414]/30 px-2 py-1 font-medium">{it.TenHang}</td>
                   <td className="border border-[#141414]/30 px-2 py-1">{it.ViTri}</td>
                   <td className="border border-[#141414]/30 px-2 py-1 text-right">{it.SL}</td>
@@ -442,19 +476,25 @@ export default function LossDamageModule() {
                   </td>
                   <td className="border border-[#141414]/30 p-0">
                     <input
-                      type="number"
                       value={it.ThuKhach || ''}
                       onChange={(e) => handleFieldChange(it.rowIndex, 'ThuKhach', e.target.value)}
-                      onBlur={() => persistRow(it.rowIndex)}
+                      onBlur={() => {
+                        handleFieldChange(it.rowIndex, 'ThuKhach', parseAmount(it.ThuKhach));
+                        persistRow(it.rowIndex);
+                      }}
+                      inputMode="numeric"
                       className="w-24 bg-transparent px-2 py-1 text-right text-teal-600 focus:bg-yellow-300 focus:outline-none focus:ring-2 focus:ring-yellow-500"
                     />
                   </td>
                   <td className="border border-[#141414]/30 p-0">
                     <input
-                      type="number"
                       value={it.FOCCost || ''}
                       onChange={(e) => handleFieldChange(it.rowIndex, 'FOCCost', e.target.value)}
-                      onBlur={() => persistRow(it.rowIndex)}
+                      onBlur={() => {
+                        handleFieldChange(it.rowIndex, 'FOCCost', parseAmount(it.FOCCost));
+                        persistRow(it.rowIndex);
+                      }}
+                      inputMode="numeric"
                       className="w-24 bg-transparent px-2 py-1 text-right text-red-500 focus:bg-yellow-300 focus:outline-none focus:ring-2 focus:ring-yellow-500"
                     />
                   </td>
