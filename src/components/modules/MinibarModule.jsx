@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   Coffee, Download, Printer, Loader2, X, AlertTriangle, Plus, RefreshCw,
-  Layers, Receipt, ChevronDown, Edit2, Trash2,
+  Layers, Receipt, ChevronDown, Edit2, Trash2, FileUp, Search,
 } from 'lucide-react';
 import * as XLSX from 'xlsx-js-style';
 import { useStore } from '../../context/StoreContext';
+import { parsePMSPdfFile } from '../../services/pmsPdfParser';
 import {
   getMinibarCatalog, saveMinibarCatalogItem,
   getMinibarSetup, saveMinibarSetupItem,
@@ -149,6 +150,134 @@ function DiscrepancyModal({ items, onClose }) {
 // ==================================================================
 // SUB 4C: Bảng Báo Cáo Tổng Minibar
 // ==================================================================
+// ==================================================================
+// Đối soát App HK vs PMS PDF
+// ==================================================================
+function compareAppVsPMS(appBillRows, pmsRecords) {
+  const appMap = {};
+  appBillRows.forEach((r) => {
+    const key = `${r.Ngay}|${r.Phong}|${r.TenHang}`;
+    appMap[key] = (appMap[key] || 0) + (Number(r.SLBill) || 0);
+  });
+  const pmsMap = {};
+  pmsRecords.forEach((r) => {
+    const key = `${r.ngay}|${r.phong}|${r.tenItem}`;
+    pmsMap[key] = (pmsMap[key] || 0) + r.soLuong;
+  });
+  const allKeys = new Set([...Object.keys(appMap), ...Object.keys(pmsMap)]);
+  const rows = [];
+  allKeys.forEach((key) => {
+    const [ngay, phong, tenItem] = key.split('|');
+    const slApp = appMap[key] || 0;
+    const slPms = pmsMap[key] || 0;
+    const diff = slApp - slPms;
+    if (diff !== 0) rows.push({ ngay, phong, tenItem, slApp, slPms, diff });
+  });
+  return rows.sort((a, b) => a.ngay.localeCompare(b.ngay) || a.phong.localeCompare(b.phong));
+}
+
+function PMSReconciliationModal({ rows, onClose }) {
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
+  const [roomFilter, setRoomFilter] = useState('');
+
+  const filtered = useMemo(() => rows.filter((r) => {
+    if (fromDate && r.ngay < fromDate) return false;
+    if (toDate && r.ngay > toDate) return false;
+    if (roomFilter && !r.phong.includes(roomFilter.trim())) return false;
+    return true;
+  }), [rows, fromDate, toDate, roomFilter]);
+
+  const handleExport = () => {
+    const grey = 'D9D9D9';
+    const thin = { top: { style: 'thin', color: { rgb: 'CCCCCC' } }, bottom: { style: 'thin', color: { rgb: 'CCCCCC' } }, left: { style: 'thin', color: { rgb: 'CCCCCC' } }, right: { style: 'thin', color: { rgb: 'CCCCCC' } } };
+    const headers = ['NGÀY', 'SỐ PHÒNG', 'TÊN ITEM MINIBAR', 'SL BILLED (APP HK)', 'SL BILLED (PMS PDF)', 'CHÊNH LỆCH', 'TRẠNG THÁI'];
+    const aoa = [['M HOTEL - BÁO CÁO ĐỐI SOÁT BILL MINIBAR (APP HK vs PMS)'], [], headers];
+    filtered.forEach((r) => {
+      aoa.push([fmtDateDisplay(r.ngay), r.phong, r.tenItem, r.slApp, r.slPms, r.diff, r.diff > 0 ? 'Thừa trên App' : 'Thiếu trên App']);
+    });
+    const ws = XLSX.utils.aoa_to_sheet(aoa);
+    const lastCol = headers.length - 1;
+    ws['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: lastCol } }];
+    ws['!cols'] = [{ wch: 11 }, { wch: 9 }, { wch: 20 }, { wch: 14 }, { wch: 14 }, { wch: 10 }, { wch: 16 }];
+    const setStyle = (r, c, style) => {
+      const ref = XLSX.utils.encode_cell({ r, c });
+      if (!ws[ref]) ws[ref] = { t: 's', v: '' };
+      ws[ref].s = { ...(ws[ref].s || {}), ...style };
+    };
+    setStyle(0, 0, { font: { bold: true, sz: 13, name: 'Times New Roman' } });
+    for (let c = 0; c <= lastCol; c++) setStyle(2, c, { font: { bold: true, sz: 9, name: 'Times New Roman' }, fill: { fgColor: { rgb: grey } }, alignment: { horizontal: 'center', wrapText: true }, border: thin });
+    for (let r = 3; r < aoa.length; r++) for (let c = 0; c <= lastCol; c++) setStyle(r, c, { font: { sz: 9, name: 'Times New Roman' }, alignment: { horizontal: c >= 3 ? 'right' : 'left' }, border: thin });
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'DoiSoatPMS');
+    XLSX.writeFile(wb, `Doi_Soat_PMS_Minibar.xlsx`);
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 print:hidden">
+      <div className="flex max-h-[85vh] w-[900px] flex-col rounded-lg bg-white p-5 shadow-xl">
+        <div className="mb-3 flex items-center justify-between border-b border-slate-200 pb-3">
+          <h3 className="flex items-center gap-2 text-base font-bold text-red-600">
+            <AlertTriangle className="h-5 w-5" /> Bảng Đối Soát Chênh Lệch Bill Minibar ({filtered.length})
+          </h3>
+          <button onClick={onClose}><X className="h-5 w-5 text-slate-400" /></button>
+        </div>
+
+        <div className="mb-3 flex flex-wrap items-center gap-2 text-xs">
+          <span className="text-slate-500">Từ ngày</span>
+          <input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} className="rounded border border-slate-300 px-2 py-1" />
+          <span className="text-slate-500">Đến ngày</span>
+          <input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} className="rounded border border-slate-300 px-2 py-1" />
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+            <input value={roomFilter} onChange={(e) => setRoomFilter(e.target.value)} placeholder="Lọc số phòng..." className="rounded border border-slate-300 py-1 pl-7 pr-2" />
+          </div>
+          <button onClick={handleExport} className="ml-auto flex items-center gap-1 rounded bg-[#141414] px-3 py-1.5 font-bold text-white">
+            <Download className="h-3.5 w-3.5" /> Xuất Báo Cáo Lệch (Excel)
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto rounded border border-slate-200">
+          {filtered.length === 0 ? (
+            <p className="py-8 text-center text-sm text-slate-400">Không có chênh lệch nào phù hợp bộ lọc 🎉</p>
+          ) : (
+            <table className="w-full border-collapse text-xs">
+              <thead className="sticky top-0 bg-[#F2F1EE] font-mono uppercase text-[10px]">
+                <tr>
+                  <th className="border border-slate-300 px-2 py-1.5 text-left">Ngày</th>
+                  <th className="border border-slate-300 px-2 py-1.5 text-left">Số Phòng</th>
+                  <th className="border border-slate-300 px-2 py-1.5 text-left">Item Minibar</th>
+                  <th className="border border-slate-300 px-2 py-1.5 text-right">SL App HK</th>
+                  <th className="border border-slate-300 px-2 py-1.5 text-right">SL PMS PDF</th>
+                  <th className="border border-slate-300 px-2 py-1.5 text-right">Chênh Lệch</th>
+                  <th className="border border-slate-300 px-2 py-1.5 text-left">Trạng Thái</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((r, idx) => (
+                  <tr key={idx}>
+                    <td className="border border-slate-200 px-2 py-1.5 whitespace-nowrap">{fmtDateDisplay(r.ngay)}</td>
+                    <td className="border border-slate-200 px-2 py-1.5 font-semibold">{r.phong}</td>
+                    <td className="border border-slate-200 px-2 py-1.5">{r.tenItem}</td>
+                    <td className="border border-slate-200 px-2 py-1.5 text-right">{r.slApp}</td>
+                    <td className="border border-slate-200 px-2 py-1.5 text-right">{r.slPms}</td>
+                    <td className={`border border-slate-200 px-2 py-1.5 text-right font-bold ${r.diff > 0 ? 'text-red-600' : 'text-blue-600'}`}>
+                      {r.diff > 0 ? '+' : ''}{r.diff}
+                    </td>
+                    <td className="border border-slate-200 px-2 py-1.5 text-[11px]">
+                      {r.diff > 0 ? '🔴 Thừa trên App HK — chưa khớp PMS' : '🔵 Thiếu trên App HK — có trên PMS nhưng chưa Post'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function SummaryTab({ thang, catalog, onReloadCatalog }) {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -158,13 +287,20 @@ function SummaryTab({ thang, catalog, onReloadCatalog }) {
   const [showDiscrepancy, setShowDiscrepancy] = useState(false);
   const [rolloverBusy, setRolloverBusy] = useState(false);
   const [confirmRollover, setConfirmRollover] = useState(false);
+  const [pmsRecords, setPmsRecords] = useState(null);
+  const [pmsFileName, setPmsFileName] = useState('');
+  const [pmsUploading, setPmsUploading] = useState(false);
+  const [pmsError, setPmsError] = useState(null);
+  const [showPmsModal, setShowPmsModal] = useState(false);
+  const [bills, setBills] = useState([]);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const data = await getMinibarSummary(thang);
+      const [data, billsData] = await Promise.all([getMinibarSummary(thang), getMinibarBills(thang)]);
       setItems(data);
+      setBills(billsData);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -173,6 +309,30 @@ function SummaryTab({ thang, catalog, onReloadCatalog }) {
   }, [thang]);
 
   useEffect(() => { load(); }, [load]);
+  useEffect(() => { setPmsRecords(null); setPmsFileName(''); }, [thang]);
+
+  const pmsDiscrepancies = useMemo(() => {
+    if (!pmsRecords) return [];
+    return compareAppVsPMS(bills, pmsRecords);
+  }, [bills, pmsRecords]);
+
+  const handleUploadPMS = async (file) => {
+    if (!file) return;
+    setPmsUploading(true);
+    setPmsError(null);
+    try {
+      const records = await parsePMSPdfFile(file);
+      if (records.length === 0) {
+        setPmsError('Không đọc được dữ liệu nào từ file PDF này. Kiểm tra lại đúng file "Báo Cáo Buồng Phòng" từ PMS.');
+      }
+      setPmsRecords(records);
+      setPmsFileName(file.name);
+    } catch (err) {
+      setPmsError('Lỗi khi đọc file PDF: ' + err.message);
+    } finally {
+      setPmsUploading(false);
+    }
+  };
 
   const totals = useMemo(() => {
     const setupTotal = items.reduce((s, it) => s + (Number(it.SetupRoom) || 0), 0);
@@ -265,6 +425,11 @@ function SummaryTab({ thang, catalog, onReloadCatalog }) {
           <Plus className="h-3.5 w-3.5" /> Thêm Item Minibar
         </button>
         <div className="flex flex-wrap items-center gap-2">
+          <label className="flex cursor-pointer items-center gap-1 rounded border border-blue-400 bg-blue-50 px-3 py-1.5 text-xs font-bold text-blue-700 hover:bg-blue-100">
+            {pmsUploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileUp className="h-3.5 w-3.5" />}
+            Upload Báo Cáo PMS (PDF)
+            <input type="file" accept="application/pdf" className="hidden" onChange={(e) => handleUploadPMS(e.target.files?.[0])} />
+          </label>
           <button onClick={handleExportExcel} className="flex items-center gap-1 rounded bg-[#141414] px-3 py-1.5 text-xs font-bold text-white hover:bg-slate-800">
             <Download className="h-3.5 w-3.5" /> Export Minibar Excel
           </button>
@@ -277,13 +442,19 @@ function SummaryTab({ thang, catalog, onReloadCatalog }) {
         </div>
       </div>
 
+      {pmsError && (
+        <div className="mb-3 flex items-center justify-between rounded border border-amber-400 bg-amber-50 px-3 py-2 text-sm text-amber-700 print:hidden">
+          <span>{pmsError}</span><button onClick={() => setPmsError(null)}><X className="h-4 w-4" /></button>
+        </div>
+      )}
+
       {error && (
         <div className="mb-3 flex items-center justify-between rounded border border-red-500 bg-red-50 px-3 py-2 text-sm text-red-700 print:hidden">
           <span>{error}</span><button onClick={() => setError(null)}><X className="h-4 w-4" /></button>
         </div>
       )}
 
-      <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2 print:hidden">
+      <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 print:hidden">
         <button onClick={() => setShowDiscrepancy(true)} className="flex items-center justify-between rounded border border-[#141414] bg-white p-4 text-left hover:bg-red-50/40">
           <div>
             <p className="text-xs font-mono uppercase text-slate-500">Chênh Lệch Kiểm Kê</p>
@@ -298,6 +469,24 @@ function SummaryTab({ thang, catalog, onReloadCatalog }) {
           </div>
           <ChevronDown className="h-5 w-5 -rotate-90 text-slate-400" />
         </button>
+
+        {pmsRecords && (
+          <button onClick={() => setShowPmsModal(true)} className="flex items-center justify-between rounded border border-[#141414] bg-white p-4 text-left hover:bg-red-50/40">
+            <div>
+              <p className="text-xs font-mono uppercase text-slate-500">Đối Soát PMS</p>
+              {pmsDiscrepancies.length > 0 ? (
+                <p className="mt-1 flex items-center gap-2 text-xl font-bold text-red-600">
+                  <AlertTriangle className="h-6 w-6" /> Lệch {pmsDiscrepancies.length} Bill
+                </p>
+              ) : (
+                <p className="mt-1 text-xl font-bold text-emerald-600">Khớp 100%</p>
+              )}
+              <p className="truncate text-[11px] text-slate-400">So với: {pmsFileName}</p>
+            </div>
+            <ChevronDown className="h-5 w-5 -rotate-90 text-slate-400" />
+          </button>
+        )}
+
         <div className="rounded border border-[#141414] bg-white p-4">
           <p className="text-xs font-mono uppercase text-slate-500">Tồn Khay Setup Phòng</p>
           <p className="mt-1 text-2xl font-bold text-[#141414]">{fmtNumber(totals.setupTotal)} <span className="text-sm font-normal text-slate-400">mục</span></p>
@@ -372,6 +561,7 @@ function SummaryTab({ thang, catalog, onReloadCatalog }) {
 
       {showAddModal && <AddCatalogItemModal onCancel={() => setShowAddModal(false)} onConfirm={handleAddCatalogItem} />}
       {showDiscrepancy && <DiscrepancyModal items={items} onClose={() => setShowDiscrepancy(false)} />}
+      {showPmsModal && <PMSReconciliationModal rows={pmsDiscrepancies} onClose={() => setShowPmsModal(false)} />}
 
       {confirmRollover && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 print:hidden">
