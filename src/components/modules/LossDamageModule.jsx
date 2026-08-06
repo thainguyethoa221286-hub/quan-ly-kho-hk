@@ -134,7 +134,7 @@ function AddDamageModal({ catalog, onCancel, onConfirm }) {
             />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-semibold text-slate-600">Người Báo Cáo</label>
+            <label className="mb-1 block text-xs font-semibold text-slate-600">Phê Duyệt Bởi</label>
             <input value={form.NguoiBaoCao} onChange={set('NguoiBaoCao')} placeholder="VD: HK Supervisor" className="w-full rounded border border-slate-300 px-2 py-2 text-sm focus:outline-none" />
           </div>
         </div>
