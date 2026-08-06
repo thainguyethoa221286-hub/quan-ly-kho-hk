@@ -84,17 +84,22 @@ export function rolloverMonth(fromThang, toThang) {
 
 /** ===== Module 02: Đề Xuất Mua Hàng PR-PO ===== */
 
-/** Lấy danh sách PR-PO của 1 tháng (tự đồng bộ mặt hàng mới + StockInHand sống từ Module 01) */
+/** Lấy danh sách PR-PO của 1 tháng (bao gồm cả mặt hàng đang ẩn — frontend tự lọc) */
 export function getPRPOData(thang) {
   return jsonpRequest({ action: 'getPRPO', thang }, 30000);
 }
 
-/** Lưu 1 dòng PR-PO (StockMax, QTY, GhiChu) */
+/** Lưu 1 dòng PR-PO (StockMax, GhiChu) */
 export function savePRPOItem(thang, item) {
   return jsonpRequest({ action: 'savePRPO', thang, item: JSON.stringify(item) });
 }
 
-/** Xoá 1 dòng PR-PO */
-export function deletePRPOItem(thang, rowIndex) {
-  return jsonpRequest({ action: 'deletePRPO', thang, rowIndex });
+/** Ẩn (hidden=true) hoặc hiện lại (hidden=false) 1 mặt hàng PR-PO — KHÔNG xoá dòng thật */
+export function setPRPOHidden(thang, rowIndex, hidden) {
+  return jsonpRequest({ action: 'setPRPOHidden', thang, rowIndex, hidden: String(hidden) });
+}
+
+/** Tạo mặt hàng hoàn toàn mới — tự động thêm vào cả Module 01 (Kho) và Module 02 (PR-PO) */
+export function addNewItemFull(thang, tenHang, dvt) {
+  return jsonpRequest({ action: 'addNewItemFull', thang, tenHang, dvt });
 }
