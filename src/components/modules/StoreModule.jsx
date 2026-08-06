@@ -512,7 +512,7 @@ export default function StoreModule() {
                       value={it.Nhap}
                       onChange={(e) => handleFieldChange(it.rowIndex, 'Nhap', e.target.value)}
                       onBlur={() => handleFieldBlur(it.rowIndex)}
-                      className="w-16 bg-transparent px-2 py-1 text-right focus:bg-yellow-50 focus:outline-none"
+                      className="w-16 bg-transparent px-2 py-1 text-right focus:bg-yellow-300 focus:outline-none focus:ring-2 focus:ring-yellow-500"
                     />
                   </td>
                   <td className="border border-[#141414]/30 p-0">
@@ -521,7 +521,7 @@ export default function StoreModule() {
                       value={it.Transfer}
                       onChange={(e) => handleFieldChange(it.rowIndex, 'Transfer', e.target.value)}
                       onBlur={() => handleFieldBlur(it.rowIndex)}
-                      className="w-16 bg-transparent px-2 py-1 text-right focus:bg-yellow-50 focus:outline-none"
+                      className="w-16 bg-transparent px-2 py-1 text-right focus:bg-yellow-300 focus:outline-none focus:ring-2 focus:ring-yellow-500"
                     />
                   </td>
                   <td className="border border-[#141414]/30 px-2 py-1 text-right text-slate-500" title="Tự động đồng bộ từ Module Hư Hỏng & Thiệt Hại">
@@ -533,7 +533,7 @@ export default function StoreModule() {
                       value={it.SuDung}
                       onChange={(e) => handleFieldChange(it.rowIndex, 'SuDung', e.target.value)}
                       onBlur={() => handleFieldBlur(it.rowIndex)}
-                      className="w-16 bg-transparent px-2 py-1 text-right focus:bg-yellow-50 focus:outline-none"
+                      className="w-16 bg-transparent px-2 py-1 text-right focus:bg-yellow-300 focus:outline-none focus:ring-2 focus:ring-yellow-500"
                     />
                   </td>
 
@@ -546,7 +546,7 @@ export default function StoreModule() {
                       value={it.Ton}
                       onChange={(e) => handleFieldChange(it.rowIndex, 'Ton', e.target.value)}
                       onBlur={() => handleFieldBlur(it.rowIndex)}
-                      className="w-16 bg-transparent px-2 py-1 text-right font-semibold text-red-600 focus:bg-yellow-50 focus:outline-none"
+                      className="w-16 bg-transparent px-2 py-1 text-right font-semibold text-red-600 focus:bg-yellow-300 focus:outline-none focus:ring-2 focus:ring-yellow-500"
                     />
                   </td>
 
@@ -557,7 +557,7 @@ export default function StoreModule() {
                       value={it.GhiChu || ''}
                       onChange={(e) => handleFieldChange(it.rowIndex, 'GhiChu', e.target.value)}
                       onBlur={() => handleFieldBlur(it.rowIndex)}
-                      className="w-32 bg-transparent px-2 py-1 focus:bg-yellow-50 focus:outline-none"
+                      className="w-32 bg-transparent px-2 py-1 focus:bg-yellow-300 focus:outline-none focus:ring-2 focus:ring-yellow-500"
                     />
                   </td>
 
