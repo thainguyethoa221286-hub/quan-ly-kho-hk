@@ -103,3 +103,25 @@ export function setPRPOHidden(thang, rowIndex, hidden) {
 export function addNewItemFull(thang, tenHang, dvt) {
   return jsonpRequest({ action: 'addNewItemFull', thang, tenHang, dvt });
 }
+
+/** ===== Module 03: Báo Cáo Hư Hỏng / FOC ===== */
+
+/** Lấy danh mục Item cho Module 03 (tự bổ sung Item mới từ Module 01, cột Nhom để trống) */
+export function getDamageItemsCatalog(thang) {
+  return jsonpRequest({ action: 'getDamageCatalog', thang }, 30000);
+}
+
+/** Lấy danh sách báo cáo hư hỏng của 1 tháng */
+export function getDamageData(thang) {
+  return jsonpRequest({ action: 'getDamageData', thang });
+}
+
+/** Lưu 1 dòng báo cáo hư hỏng (tạo mới sẽ tự đồng bộ SL vào Module 01 nếu trùng tên) */
+export function saveDamageItem(thang, item) {
+  return jsonpRequest({ action: 'saveDamageItem', thang, item: JSON.stringify(item) });
+}
+
+/** Xoá 1 dòng báo cáo hư hỏng (tự trừ ngược SL khỏi Module 01 nếu dòng đó từng đồng bộ) */
+export function deleteDamageItem(thang, rowIndex) {
+  return jsonpRequest({ action: 'deleteDamageItem', thang, rowIndex });
+}
