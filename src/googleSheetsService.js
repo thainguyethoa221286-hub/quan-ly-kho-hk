@@ -74,7 +74,10 @@ export function listAvailableMonths() {
   return jsonpRequest({ action: 'listMonths' });
 }
 
-/** Kết chuyển từ tháng hiện tại sang tháng kế tiếp */
+/** Kết chuyển từ tháng hiện tại sang tháng kế tiếp — thao tác này có thể mất
+ * nhiều thời gian hơn bình thường (tạo tab mới + ghi nhiều dòng), nên dùng
+ * thời gian chờ dài hơn (60s) để tránh báo lỗi timeout giả trong khi
+ * Google Sheets vẫn đang xử lý thành công phía sau. */
 export function rolloverMonth(fromThang, toThang) {
-  return jsonpRequest({ action: 'rolloverMonth', fromThang, toThang });
+  return jsonpRequest({ action: 'rolloverMonth', fromThang, toThang }, 60000);
 }
