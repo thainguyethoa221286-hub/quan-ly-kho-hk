@@ -1,32 +1,112 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { ShoppingCart, RefreshCw, Download, Printer, Loader2, X, AlertTriangle } from 'lucide-react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { ShoppingCart, Download, Printer, Loader2, X, AlertTriangle, Plus, Search, ChevronDown } from 'lucide-react';
 import * as XLSX from 'xlsx-js-style';
 import { useStore } from '../../context/StoreContext';
 import {
+  getKhoData,
   getPRPOData,
   savePRPOItem,
   deletePRPOItem,
-  recalcPRPO,
 } from '../../services/googleSheetsService';
 
 const fmtNumber = (v) => (Number(v) || 0).toLocaleString('vi-VN');
+
+// ---------- Modal: Thêm Mặt Hàng PR (chọn từ danh mục Kho Store) ----------
+function AddItemModal({ storeItems, existingNames, onCancel, onConfirm }) {
+  const [search, setSearch] = useState('');
+  const [selected, setSelected] = useState(new Set());
+
+  const available = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    return storeItems.filter((it) => {
+      if (existingNames.has(it.TenHang)) return false;
+      if (!term) return true;
+      return String(it.TenHang || '').toLowerCase().includes(term);
+    });
+  }, [storeItems, existingNames, search]);
+
+  const toggle = (tenHang) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(tenHang)) next.delete(tenHang);
+      else next.add(tenHang);
+      return next;
+    });
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 print:hidden">
+      <div className="flex max-h-[80vh] w-[480px] flex-col rounded-lg bg-white p-5 shadow-xl">
+        <h3 className="mb-3 text-base font-bold">Thêm Mặt Hàng PR từ Kho</h3>
+        <div className="relative mb-3">
+          <Search className="pointer-events-none absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          <input
+            autoFocus
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Tìm tên mặt hàng trong Kho..."
+            className="w-full rounded border border-slate-300 py-1.5 pl-8 pr-3 text-sm focus:outline-none"
+          />
+        </div>
+        <div className="flex-1 overflow-y-auto rounded border border-slate-200">
+          {available.length === 0 ? (
+            <p className="p-4 text-center text-sm text-slate-400">
+              {storeItems.length === 0 ? 'Chưa có mặt hàng nào trong Kho.' : 'Không còn mặt hàng phù hợp (đã có trong danh sách hoặc không khớp tìm kiếm).'}
+            </p>
+          ) : (
+            available.map((it) => (
+              <label
+                key={it.TenHang}
+                className="flex cursor-pointer items-center gap-2 border-b border-slate-100 px-3 py-2 text-sm last:border-0 hover:bg-slate-50"
+              >
+                <input
+                  type="checkbox"
+                  checked={selected.has(it.TenHang)}
+                  onChange={() => toggle(it.TenHang)}
+                  className="h-4 w-4"
+                />
+                <span className="flex-1">{it.TenHang}</span>
+                <span className="text-xs text-slate-400">{it.DVT}</span>
+                <span className="w-16 text-right text-xs text-slate-500">Tồn: {fmtNumber(it.Ton)}</span>
+              </label>
+            ))
+          )}
+        </div>
+        <div className="mt-4 flex justify-end gap-2">
+          <button onClick={onCancel} className="rounded border border-[#141414] px-3 py-1.5 text-sm">Huỷ</button>
+          <button
+            onClick={() => onConfirm(storeItems.filter((it) => selected.has(it.TenHang)))}
+            disabled={selected.size === 0}
+            className="flex items-center gap-1 rounded bg-[#141414] px-3 py-1.5 text-sm font-bold text-white disabled:opacity-40"
+          >
+            <Plus className="h-4 w-4" /> Thêm {selected.size > 0 ? `(${selected.size})` : ''}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function PRPOModule() {
   const { selectedMonth } = useStore();
   const thang = selectedMonth;
 
   const [items, setItems] = useState([]);
+  const [storeItems, setStoreItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [savingRows, setSavingRows] = useState({});
-  const [recalcBusy, setRecalcBusy] = useState(false);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [showUrgentList, setShowUrgentList] = useState(false);
+  const urgentRef = useRef(null);
 
   const loadData = useCallback(async (month) => {
     setLoading(true);
     setError(null);
     try {
-      const data = await getPRPOData(month);
-      setItems(data);
+      const [prpoData, storeData] = await Promise.all([getPRPOData(month), getKhoData(month)]);
+      setItems(prpoData);
+      setStoreItems(storeData);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -38,18 +118,28 @@ export default function PRPOModule() {
     loadData(thang);
   }, [thang, loadData]);
 
+  // Đóng popover "Mặt Hàng Mua Khẩn" khi bấm ra ngoài
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (urgentRef.current && !urgentRef.current.contains(e.target)) setShowUrgentList(false);
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   const totals = useMemo(() => {
     const sumDeXuat = items.reduce((acc, it) => acc + (Number(it.DeXuatMua) || 0), 0);
-    const sumQty = items.reduce((acc, it) => acc + (Number(it.QTY) || 0), 0);
-    const urgentCount = items.filter((it) => (Number(it.StockInHand) || 0) <= 0).length;
-    return { sumDeXuat, sumQty, urgentCount };
+    const urgentItems = items.filter((it) => (Number(it.StockInHand) || 0) <= 0);
+    return { sumDeXuat, urgentItems };
   }, [items]);
+
+  const existingNames = useMemo(() => new Set(items.map((it) => it.TenHang)), [items]);
 
   const handleFieldChange = (rowIndex, field, value) => {
     setItems((prev) => prev.map((it) => (it.rowIndex === rowIndex ? { ...it, [field]: value } : it)));
   };
 
-  const handleFieldBlur = async (rowIndex) => {
+  const persistRow = async (rowIndex) => {
     const item = items.find((it) => it.rowIndex === rowIndex);
     if (!item) return;
     setSavingRows((s) => ({ ...s, [rowIndex]: true }));
@@ -60,7 +150,6 @@ export default function PRPOModule() {
         TenHang: item.TenHang,
         DVT: item.DVT,
         StockMax: item.StockMax,
-        QTY: item.QTY,
         GhiChu: item.GhiChu,
       });
     } catch (err) {
@@ -74,29 +163,57 @@ export default function PRPOModule() {
     }
   };
 
-  // Khi sửa StockMax, đề xuất mua (hiển thị) cũng cần tính lại ngay trên UI
+  // Sửa StockMax -> Đề Xuất Mua hiển thị cần tính lại ngay trên UI
   const handleStockMaxChange = (rowIndex, value) => {
     setItems((prev) =>
       prev.map((it) => {
         if (it.rowIndex !== rowIndex) return it;
         const stockMax = Number(value) || 0;
         const stockInHand = Number(it.StockInHand) || 0;
-        const deXuatMua = Math.max(stockMax - stockInHand, 0);
-        return { ...it, StockMax: value, DeXuatMua: deXuatMua };
+        return { ...it, StockMax: value, DeXuatMua: Math.max(stockMax - stockInHand, 0) };
       })
     );
   };
 
-  const handleRecalc = async () => {
-    setRecalcBusy(true);
-    setError(null);
+  /** Điều hướng phím trong lưới: Enter/ArrowDown xuống dòng dưới, ArrowUp lên dòng
+   * trên — luôn preventDefault để không bị input[type=number] tự trừ/cộng giá trị. */
+  const handleGridKeyDown = (e, field) => {
+    if (e.key !== 'Enter' && e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+    e.preventDefault();
+    const inputs = Array.from(document.querySelectorAll(`input[data-field="${field}"]`));
+    const idx = inputs.indexOf(e.target);
+    if (idx === -1) return;
+    if ((e.key === 'Enter' || e.key === 'ArrowDown') && idx < inputs.length - 1) {
+      inputs[idx + 1].focus();
+      inputs[idx + 1].select?.();
+    } else if (e.key === 'ArrowUp' && idx > 0) {
+      inputs[idx - 1].focus();
+      inputs[idx - 1].select?.();
+    }
+  };
+
+  const handleAddItems = async (picked) => {
+    setShowAddModal(false);
     try {
-      await recalcPRPO(thang);
+      const nextSttStart = items.length + 1;
+      for (let i = 0; i < picked.length; i++) {
+        const it = picked[i];
+        // eslint-disable-next-line no-await-in-loop
+        await savePRPOItem(thang, { Stt: nextSttStart + i, TenHang: it.TenHang, DVT: it.DVT, StockMax: 0, GhiChu: '' });
+      }
       await loadData(thang);
     } catch (err) {
-      setError('Lỗi khi tính lại PR: ' + err.message);
-    } finally {
-      setRecalcBusy(false);
+      setError('Lỗi khi thêm mặt hàng: ' + err.message);
+    }
+  };
+
+  const handleDeleteRow = async (rowIndex) => {
+    if (!window.confirm('Xoá mặt hàng này khỏi danh sách PR-PO?')) return;
+    try {
+      await deletePRPOItem(thang, rowIndex);
+      setItems((prev) => prev.filter((x) => x.rowIndex !== rowIndex));
+    } catch (err) {
+      setError('Lỗi khi xoá: ' + err.message);
     }
   };
 
@@ -112,39 +229,37 @@ export default function PRPOModule() {
       right: { style: 'thin', color: { rgb: 'CCCCCC' } },
     };
 
-    const headers = ['STT', 'ITEM', 'UNIT', 'QTY', 'STOCK IN HAND', 'STOCK MAX', 'ĐỀ XUẤT MUA', 'NOTED'];
+    const headers = ['STT', 'ITEM', 'UNIT', 'STOCK IN HAND', 'STOCK MAX', 'ĐỀ XUẤT MUA', 'NOTED'];
     const aoa = [];
     aoa.push([`M HOTEL - PHIẾU ĐỀ XUẤT MUA HÀNG VẬT TƯ (PR-PO) - THÁNG ${String(m).padStart(2, '0')}/${y}`]);
     aoa.push([]);
     aoa.push(headers);
     const dataStartRow = aoa.length;
     items.forEach((it) => {
-      aoa.push([it.Stt, it.TenHang, it.DVT, it.QTY, it.StockInHand, it.StockMax, it.DeXuatMua, it.GhiChu]);
+      aoa.push([it.Stt, it.TenHang, it.DVT, it.StockInHand, it.StockMax, it.DeXuatMua, it.GhiChu]);
     });
     const dataEndRow = aoa.length - 1;
     const totalRowIdx = aoa.length;
-    aoa.push(['', 'TỔNG CỘNG', '', totals.sumQty, '', '', totals.sumDeXuat, '']);
+    aoa.push(['', 'TỔNG CỘNG', '', '', '', totals.sumDeXuat, '']);
     aoa.push([]);
     aoa.push([]);
     const sigTitleRowIdx = aoa.length;
-    aoa.push(['Người đề xuất', '', '', 'Trưởng BP Buồng Phòng', '', '', 'Bộ phận Mua hàng/Kế toán', '']);
+    aoa.push(['Người đề xuất', '', '', 'Trưởng BP Buồng Phòng', '', '', 'Bộ phận Mua hàng/Kế toán']);
     const sigSubRowIdx = aoa.length;
-    aoa.push(['(Ký & ghi rõ họ tên)', '', '', '(Ký & ghi rõ họ tên)', '', '', '(Ký & ghi rõ họ tên)', '']);
+    aoa.push(['(Ký & ghi rõ họ tên)', '', '', '(Ký & ghi rõ họ tên)', '', '', '(Ký & ghi rõ họ tên)']);
 
     const ws = XLSX.utils.aoa_to_sheet(aoa);
     const lastCol = headers.length - 1;
     ws['!merges'] = [
       { s: { r: 0, c: 0 }, e: { r: 0, c: lastCol } },
       { s: { r: sigTitleRowIdx, c: 0 }, e: { r: sigTitleRowIdx, c: 2 } },
-      { s: { r: sigTitleRowIdx, c: 3 }, e: { r: sigTitleRowIdx, c: 5 } },
-      { s: { r: sigTitleRowIdx, c: 6 }, e: { r: sigTitleRowIdx, c: 7 } },
+      { s: { r: sigTitleRowIdx, c: 3 }, e: { r: sigTitleRowIdx, c: 4 } },
+      { s: { r: sigTitleRowIdx, c: 5 }, e: { r: sigTitleRowIdx, c: 6 } },
       { s: { r: sigSubRowIdx, c: 0 }, e: { r: sigSubRowIdx, c: 2 } },
-      { s: { r: sigSubRowIdx, c: 3 }, e: { r: sigSubRowIdx, c: 5 } },
-      { s: { r: sigSubRowIdx, c: 6 }, e: { r: sigSubRowIdx, c: 7 } },
+      { s: { r: sigSubRowIdx, c: 3 }, e: { r: sigSubRowIdx, c: 4 } },
+      { s: { r: sigSubRowIdx, c: 5 }, e: { r: sigSubRowIdx, c: 6 } },
     ];
-    ws['!cols'] = [
-      { wch: 5 }, { wch: 32 }, { wch: 8 }, { wch: 8 }, { wch: 12 }, { wch: 10 }, { wch: 12 }, { wch: 20 },
-    ];
+    ws['!cols'] = [{ wch: 5 }, { wch: 32 }, { wch: 8 }, { wch: 12 }, { wch: 10 }, { wch: 12 }, { wch: 22 }];
 
     const setStyle = (r, c, style) => {
       const ref = XLSX.utils.encode_cell({ r, c });
@@ -163,7 +278,7 @@ export default function PRPOModule() {
     }
     for (let r = dataStartRow; r <= dataEndRow; r++) {
       for (let c = 0; c < headers.length; c++) {
-        const isNum = [3, 4, 5, 6].includes(c);
+        const isNum = [3, 4, 5].includes(c);
         setStyle(r, c, {
           font: { sz: 10, name: 'Times New Roman' },
           alignment: { horizontal: isNum ? 'right' : 'left', vertical: 'center' },
@@ -174,7 +289,7 @@ export default function PRPOModule() {
     for (let c = 0; c < headers.length; c++) {
       setStyle(totalRowIdx, c, { font: { bold: true, sz: 10, name: 'Times New Roman' }, fill: { fgColor: { rgb: 'F2F2F2' } }, border: thinBorder });
     }
-    [0, 3, 6].forEach((c) => {
+    [0, 3, 5].forEach((c) => {
       setStyle(sigTitleRowIdx, c, { font: { bold: true, sz: 11, name: 'Times New Roman' }, alignment: { horizontal: 'center' } });
       setStyle(sigSubRowIdx, c, { font: { italic: true, sz: 9, name: 'Times New Roman' }, alignment: { horizontal: 'center' } });
     });
@@ -190,6 +305,15 @@ export default function PRPOModule() {
         @media print {
           @page { size: A4 landscape; margin: 10mm; }
         }
+        input[type=number]::-webkit-outer-spin-button,
+        input[type=number]::-webkit-inner-spin-button {
+          -webkit-appearance: none;
+          margin: 0;
+        }
+        input[type=number] {
+          -moz-appearance: textfield;
+          appearance: textfield;
+        }
       `}</style>
 
       {/* ---- Header ---- */}
@@ -201,19 +325,16 @@ export default function PRPOModule() {
           <div>
             <h1 className="text-lg font-bold text-[#141414]">ĐỀ XUẤT MUA HÀNG PR-PO</h1>
             <p className="text-xs text-slate-500">
-              Tự động đề xuất vật tư cần mua dựa trên định mức tồn kho tối đa & tồn thực tế. Công thức:{' '}
-              <span className="font-mono font-semibold">ĐỀ XUẤT MUA = STOCK MAX − STOCK IN HAND</span>
+              Công thức: <span className="font-mono font-semibold">ĐỀ XUẤT MUA = STOCK MAX − STOCK IN HAND</span>
             </p>
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <button
-            onClick={handleRecalc}
-            disabled={recalcBusy}
-            className="flex items-center gap-1 rounded border border-[#141414] bg-white px-3 py-1.5 text-xs font-bold hover:bg-[#E4E3E0] disabled:opacity-50"
+            onClick={() => setShowAddModal(true)}
+            className="flex items-center gap-1 rounded border border-[#141414] bg-white px-3 py-1.5 text-xs font-bold hover:bg-[#E4E3E0]"
           >
-            {recalcBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
-            Tự Động Tính Lại PR
+            <Plus className="h-3.5 w-3.5" /> Thêm Mặt Hàng PR
           </button>
           <button
             onClick={handleExportExcel}
@@ -238,20 +359,43 @@ export default function PRPOModule() {
       )}
 
       {/* ---- Stat cards ---- */}
-      <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-3 print:hidden">
+      <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2 print:hidden">
         <div className="rounded border border-[#141414] bg-white p-4">
-          <p className="text-xs font-mono uppercase text-slate-500">Tổng SL Đề Xuất PR</p>
+          <p className="text-xs font-mono uppercase text-slate-500">Tổng SL Đề Xuất Mua</p>
           <p className="mt-1 text-2xl font-bold text-[#141414]">{fmtNumber(totals.sumDeXuat)} <span className="text-sm font-normal text-slate-400">sản phẩm</span></p>
         </div>
-        <div className="rounded border border-[#141414] bg-white p-4">
-          <p className="text-xs font-mono uppercase text-slate-500">Tổng SL QTY Đã Duyệt</p>
-          <p className="mt-1 text-2xl font-bold text-[#141414]">{fmtNumber(totals.sumQty)} <span className="text-sm font-normal text-slate-400">sản phẩm</span></p>
-        </div>
-        <div className="rounded border border-[#141414] bg-white p-4">
-          <p className="flex items-center gap-1 text-xs font-mono uppercase text-slate-500">
-            <AlertTriangle className="h-3.5 w-3.5 text-red-500" /> Mặt Hàng Mua Khẩn
-          </p>
-          <p className="mt-1 text-2xl font-bold text-red-600">{totals.urgentCount} <span className="text-sm font-normal text-slate-400">mục (hết tồn kho)</span></p>
+
+        {/* Thẻ Mặt Hàng Mua Khẩn — bấm để xổ danh sách */}
+        <div ref={urgentRef} className="relative">
+          <button
+            onClick={() => setShowUrgentList((s) => !s)}
+            className="flex w-full items-center justify-between rounded border border-[#141414] bg-white p-4 text-left hover:bg-red-50/40"
+          >
+            <div>
+              <p className="flex items-center gap-1 text-xs font-mono uppercase text-slate-500">
+                <AlertTriangle className="h-3.5 w-3.5 text-red-500" /> Mặt Hàng Mua Khẩn
+              </p>
+              <p className="mt-1 text-2xl font-bold text-red-600">
+                {totals.urgentItems.length} <span className="text-sm font-normal text-slate-400">mục (hết tồn kho)</span>
+              </p>
+            </div>
+            <ChevronDown className={`h-5 w-5 text-slate-400 transition-transform ${showUrgentList ? 'rotate-180' : ''}`} />
+          </button>
+
+          {showUrgentList && (
+            <div className="absolute left-0 right-0 top-full z-30 mt-1 max-h-64 overflow-y-auto rounded border border-red-300 bg-white shadow-xl">
+              {totals.urgentItems.length === 0 ? (
+                <p className="p-3 text-center text-sm text-slate-400">Không có mặt hàng nào hết tồn kho 🎉</p>
+              ) : (
+                totals.urgentItems.map((it) => (
+                  <div key={it.rowIndex} className="flex items-center justify-between border-b border-red-100 px-3 py-2 text-sm last:border-0">
+                    <span className="font-medium text-[#141414]">{it.TenHang}</span>
+                    <span className="text-xs font-bold text-red-600">Tồn: 0 {it.DVT}</span>
+                  </div>
+                ))
+              )}
+            </div>
+          )}
         </div>
       </div>
 
@@ -262,12 +406,12 @@ export default function PRPOModule() {
       </div>
 
       {/* ---- Table ---- */}
-      <div className="overflow-x-auto rounded border border-[#141414] bg-white">
+      <div className="max-h-[calc(100vh-320px)] overflow-y-auto overflow-x-auto rounded border border-[#141414] bg-white">
         <table className="w-full border-collapse text-xs">
           <thead className="bg-[#F2F1EE] font-mono uppercase text-[10px] text-[#141414]">
             <tr>
-              {['STT', 'ITEM', 'UNIT', 'QTY', 'STOCK IN HAND', 'STOCK MAX', 'ĐỀ XUẤT MUA', 'NOTED', ''].map((h, i) => (
-                <th key={h + i} className={`border border-[#141414]/30 px-2 py-2 text-left ${i === 1 ? 'min-w-[260px]' : ''}`}>
+              {['STT', 'ITEM', 'UNIT', 'STOCK IN HAND', 'STOCK MAX', 'ĐỀ XUẤT MUA', 'NOTED', ''].map((h, i) => (
+                <th key={h + i} className={`sticky top-0 z-20 border border-[#141414]/30 bg-[#F2F1EE] px-2 py-2 text-left shadow-[0_1px_0_0_#141414] ${i === 1 ? 'min-w-[260px]' : ''}`}>
                   {h}
                 </th>
               ))}
@@ -276,14 +420,14 @@ export default function PRPOModule() {
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={9} className="py-8 text-center text-slate-400">
+                <td colSpan={8} className="py-8 text-center text-slate-400">
                   <Loader2 className="mx-auto h-5 w-5 animate-spin" /> Đang tải dữ liệu...
                 </td>
               </tr>
             ) : items.length === 0 ? (
               <tr>
-                <td colSpan={9} className="py-8 text-center text-slate-400">
-                  Chưa có mặt hàng. Vào Module 01 (Kho & Vật Tư) để thêm mặt hàng trước.
+                <td colSpan={8} className="py-8 text-center text-slate-400">
+                  Chưa có mặt hàng đề xuất. Bấm "+ Thêm Mặt Hàng PR" để chọn mặt hàng từ Kho.
                 </td>
               </tr>
             ) : (
@@ -295,17 +439,6 @@ export default function PRPOModule() {
                     <td className="min-w-[260px] border border-[#141414]/30 px-2 py-1 font-medium">{it.TenHang}</td>
                     <td className="border border-[#141414]/30 px-2 py-1">{it.DVT}</td>
 
-                    {/* Editable: QTY */}
-                    <td className="border border-[#141414]/30 p-0">
-                      <input
-                        type="number"
-                        value={it.QTY}
-                        onChange={(e) => handleFieldChange(it.rowIndex, 'QTY', e.target.value)}
-                        onBlur={() => handleFieldBlur(it.rowIndex)}
-                        className="w-16 bg-transparent px-2 py-1 text-right font-semibold focus:bg-yellow-300 focus:outline-none focus:ring-2 focus:ring-yellow-500"
-                      />
-                    </td>
-
                     <td className={`border border-[#141414]/30 px-2 py-1 text-right ${isUrgent ? 'font-bold text-red-600' : ''}`}>
                       {fmtNumber(it.StockInHand)}
                     </td>
@@ -314,9 +447,11 @@ export default function PRPOModule() {
                     <td className="border border-[#141414]/30 p-0">
                       <input
                         type="number"
+                        data-field="StockMax"
                         value={it.StockMax}
                         onChange={(e) => handleStockMaxChange(it.rowIndex, e.target.value)}
-                        onBlur={() => handleFieldBlur(it.rowIndex)}
+                        onKeyDown={(e) => handleGridKeyDown(e, 'StockMax')}
+                        onBlur={() => persistRow(it.rowIndex)}
                         className="w-16 bg-transparent px-2 py-1 text-right focus:bg-yellow-300 focus:outline-none focus:ring-2 focus:ring-yellow-500"
                       />
                     </td>
@@ -326,28 +461,17 @@ export default function PRPOModule() {
                     {/* Editable: GhiChu */}
                     <td className="border border-[#141414]/30 p-0">
                       <input
+                        data-field="GhiChu"
                         value={it.GhiChu || ''}
                         onChange={(e) => handleFieldChange(it.rowIndex, 'GhiChu', e.target.value)}
-                        onBlur={() => handleFieldBlur(it.rowIndex)}
+                        onKeyDown={(e) => handleGridKeyDown(e, 'GhiChu')}
+                        onBlur={() => persistRow(it.rowIndex)}
                         className="w-32 bg-transparent px-2 py-1 focus:bg-yellow-300 focus:outline-none focus:ring-2 focus:ring-yellow-500"
                       />
                     </td>
 
                     <td className="border border-[#141414]/30 px-1 py-1 text-center print:hidden">
-                      <button
-                        onClick={async () => {
-                          if (!window.confirm('Xoá mặt hàng này khỏi danh sách PR-PO?')) return;
-                          try {
-                            await deletePRPOItem(thang, it.rowIndex);
-                            setItems((prev) => prev.filter((x) => x.rowIndex !== it.rowIndex));
-                          } catch (err) {
-                            setError('Lỗi khi xoá: ' + err.message);
-                          }
-                        }}
-                        className="text-red-500 hover:text-red-700"
-                      >
-                        ×
-                      </button>
+                      <button onClick={() => handleDeleteRow(it.rowIndex)} className="text-red-500 hover:text-red-700">×</button>
                     </td>
                   </tr>
                 );
@@ -357,10 +481,7 @@ export default function PRPOModule() {
           {items.length > 0 && (
             <tfoot className="bg-[#F2F1EE] font-bold">
               <tr>
-                <td colSpan={3} className="border border-[#141414]/30 px-2 py-2">TỔNG CỘNG</td>
-                <td className="border border-[#141414]/30 px-2 py-2 text-right">{fmtNumber(totals.sumQty)}</td>
-                <td className="border border-[#141414]/30 px-2 py-2" />
-                <td className="border border-[#141414]/30 px-2 py-2" />
+                <td colSpan={5} className="border border-[#141414]/30 px-2 py-2">TỔNG CỘNG</td>
                 <td className="border border-[#141414]/30 px-2 py-2 text-right">{fmtNumber(totals.sumDeXuat)}</td>
                 <td className="border border-[#141414]/30 px-2 py-2" colSpan={2} />
               </tr>
@@ -384,6 +505,15 @@ export default function PRPOModule() {
           <p className="text-xs text-slate-500">(Ký & ghi rõ họ tên)</p>
         </div>
       </div>
+
+      {showAddModal && (
+        <AddItemModal
+          storeItems={storeItems}
+          existingNames={existingNames}
+          onCancel={() => setShowAddModal(false)}
+          onConfirm={handleAddItems}
+        />
+      )}
     </div>
   );
 }
