@@ -165,6 +165,29 @@ export default function StoreModule() {
   const [rolloverBusy, setRolloverBusy] = useState(false);
   const [confirmRollover, setConfirmRollover] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
+  const [focusedRow, setFocusedRow] = useState(null);
+
+  /**
+   * Điều hướng bằng phím khi đang nhập liệu trong lưới:
+   * - Enter / ArrowDown: nhảy xuống ô cùng cột ở dòng dưới
+   * - ArrowUp: nhảy lên ô cùng cột ở dòng trên
+   * Luôn chặn hành vi mặc định (đặc biệt ArrowUp/ArrowDown trên input
+   * type="number" vốn tự tăng/giảm giá trị) để không làm sai số liệu.
+   */
+  const handleGridKeyDown = (e, field) => {
+    if (e.key !== 'Enter' && e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+    e.preventDefault();
+    const inputs = Array.from(document.querySelectorAll(`input[data-field="${field}"]`));
+    const idx = inputs.indexOf(e.target);
+    if (idx === -1) return;
+    if ((e.key === 'Enter' || e.key === 'ArrowDown') && idx < inputs.length - 1) {
+      inputs[idx + 1].focus();
+      inputs[idx + 1].select?.();
+    } else if (e.key === 'ArrowUp' && idx > 0) {
+      inputs[idx - 1].focus();
+      inputs[idx - 1].select?.();
+    }
+  };
 
   const loadData = useCallback(async (month) => {
     setLoading(true);
@@ -416,8 +439,6 @@ export default function StoreModule() {
           appearance: textfield;
         }
       `}</style>
-
-      {/* ---- Toolbar ---- */}
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2 print:hidden">
         <div className="relative">
           <Search className="pointer-events-none absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -470,7 +491,7 @@ export default function StoreModule() {
       </div>
 
       {/* ---- Table ---- */}
-      <div className="overflow-x-auto rounded border border-[#141414] bg-white">
+      <div className="max-h-[calc(100vh-220px)] overflow-y-auto overflow-x-auto rounded border border-[#141414] bg-white">
         <table className="w-full border-collapse text-xs">
           <thead className="bg-[#F2F1EE] font-mono uppercase text-[10px] text-[#141414]">
             <tr>
@@ -478,7 +499,7 @@ export default function StoreModule() {
                 'Hư hỏng/mất', 'Sử dụng', 'Tổng xuất', 'Tồn/Cuối kỳ', 'Tổng Kho', 'Ghi chú', ''].map((h, i) => (
                 <th
                   key={h + i}
-                  className={`border border-[#141414]/30 px-2 py-2 text-left ${i === 1 ? 'min-w-[280px]' : ''}`}
+                  className={`sticky top-0 z-20 border border-[#141414]/30 bg-[#F2F1EE] px-2 py-2 text-left shadow-[0_1px_0_0_#141414] ${i === 1 ? 'min-w-[280px]' : ''}`}
                 >
                   {h}
                 </th>
@@ -500,7 +521,14 @@ export default function StoreModule() {
               filteredItems.map((it) => (
                 <tr key={it.rowIndex} className={savingRows[it.rowIndex] ? 'opacity-50' : ''}>
                   <td className="border border-[#141414]/30 px-2 py-1">{it.Stt}</td>
-                  <td className="min-w-[280px] border border-[#141414]/30 px-2 py-1 font-medium" title={it.MaHang ? `Mã: ${it.MaHang}` : undefined}>
+                  <td
+                    className={`min-w-[280px] border px-2 py-1 font-medium transition-colors ${
+                      focusedRow === it.rowIndex
+                        ? 'border-amber-400 bg-yellow-100'
+                        : 'border-[#141414]/30'
+                    }`}
+                    title={it.MaHang ? `Mã: ${it.MaHang}` : undefined}
+                  >
                     {it.TenHang}
                   </td>
                   <td className="border border-[#141414]/30 px-2 py-1">{it.DVT}</td>
@@ -510,22 +538,35 @@ export default function StoreModule() {
                   <td className="border border-[#141414]/30 p-0">
                     <input
                       type="number"
+                      data-field="Nhap"
                       value={it.Nhap}
                       onChange={(e) => handleFieldChange(it.rowIndex, 'Nhap', e.target.value)}
-                      onBlur={() => handleFieldBlur(it.rowIndex)}
+                      onFocus={() => setFocusedRow(it.rowIndex)}
+                      onKeyDown={(e) => handleGridKeyDown(e, 'Nhap')}
+                      onBlur={() => { handleFieldBlur(it.rowIndex); setFocusedRow(null); }}
                       className="w-16 bg-transparent px-2 py-1 text-right focus:bg-yellow-300 focus:outline-none focus:ring-2 focus:ring-yellow-500"
                     />
                   </td>
                   <td className="border border-[#141414]/30 p-0">
                     <input
                       type="number"
+                      data-field="Transfer"
                       value={it.Transfer}
                       onChange={(e) => handleFieldChange(it.rowIndex, 'Transfer', e.target.value)}
-                      onBlur={() => handleFieldBlur(it.rowIndex)}
+                      onFocus={() => setFocusedRow(it.rowIndex)}
+                      onKeyDown={(e) => handleGridKeyDown(e, 'Transfer')}
+                      onBlur={() => { handleFieldBlur(it.rowIndex); setFocusedRow(null); }}
                       className="w-16 bg-transparent px-2 py-1 text-right focus:bg-yellow-300 focus:outline-none focus:ring-2 focus:ring-yellow-500"
                     />
                   </td>
-                  <td className="border border-[#141414]/30 px-2 py-1 text-right text-slate-500" title="Tự động đồng bộ từ Module Hư Hỏng & Thiệt Hại">
+                  <td
+                    className={`border px-2 py-1 text-right ${
+                      Number(it.HuHongMat) > 0
+                        ? 'border-red-300 bg-red-100 font-bold text-red-700'
+                        : 'border-[#141414]/30 text-slate-500'
+                    }`}
+                    title="Tự động đồng bộ từ Module Hư Hỏng & Thiệt Hại"
+                  >
                     {fmtNumber(it.HuHongMat)}
                   </td>
                   <td className="border border-[#141414]/30 px-2 py-1 text-right font-semibold" title="Tự động tính = (Đầu kỳ + Nhập) − (Tồn + Transfer + Hư hỏng/mất)">
@@ -538,9 +579,12 @@ export default function StoreModule() {
                   <td className="border border-[#141414]/30 p-0 bg-red-50/40">
                     <input
                       type="number"
+                      data-field="Ton"
                       value={it.Ton}
                       onChange={(e) => handleFieldChange(it.rowIndex, 'Ton', e.target.value)}
-                      onBlur={() => handleFieldBlur(it.rowIndex)}
+                      onFocus={() => setFocusedRow(it.rowIndex)}
+                      onKeyDown={(e) => handleGridKeyDown(e, 'Ton')}
+                      onBlur={() => { handleFieldBlur(it.rowIndex); setFocusedRow(null); }}
                       className="w-16 bg-transparent px-2 py-1 text-right font-semibold text-red-600 focus:bg-yellow-300 focus:outline-none focus:ring-2 focus:ring-yellow-500"
                     />
                   </td>
@@ -549,9 +593,12 @@ export default function StoreModule() {
 
                   <td className="border border-[#141414]/30 p-0">
                     <input
+                      data-field="GhiChu"
                       value={it.GhiChu || ''}
                       onChange={(e) => handleFieldChange(it.rowIndex, 'GhiChu', e.target.value)}
-                      onBlur={() => handleFieldBlur(it.rowIndex)}
+                      onFocus={() => setFocusedRow(it.rowIndex)}
+                      onKeyDown={(e) => handleGridKeyDown(e, 'GhiChu')}
+                      onBlur={() => { handleFieldBlur(it.rowIndex); setFocusedRow(null); }}
                       className="w-32 bg-transparent px-2 py-1 focus:bg-yellow-300 focus:outline-none focus:ring-2 focus:ring-yellow-500"
                     />
                   </td>
