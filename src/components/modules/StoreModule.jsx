@@ -12,10 +12,11 @@ import {
 // ---------- Helpers ----------
 function computeDerived(item) {
   const n = (v) => Number(v) || 0;
-  const tongXuat = n(item.Nhap) + n(item.Transfer) + n(item.HuHongMat) + n(item.SuDung);
+  const suDung = (n(item.DauKy) + n(item.Nhap)) - (n(item.Ton) + n(item.Transfer) + n(item.HuHongMat));
+  const tongXuat = n(item.Nhap) + n(item.Transfer) + n(item.HuHongMat) + suDung;
   const tongKho = n(item.Ton) + n(item.SetUp);
-  const thanhTien = n(item.SuDung) * n(item.Cost);
-  return { ...item, TongXuat: tongXuat, TongKho: tongKho, ThanhTien: thanhTien };
+  const thanhTien = suDung * n(item.Cost);
+  return { ...item, SuDung: suDung, TongXuat: tongXuat, TongKho: tongKho, ThanhTien: thanhTien };
 }
 
 function nextMonthStr(thang) {
@@ -527,14 +528,8 @@ export default function StoreModule() {
                   <td className="border border-[#141414]/30 px-2 py-1 text-right text-slate-500" title="Tự động đồng bộ từ Module Hư Hỏng & Thiệt Hại">
                     {fmtNumber(it.HuHongMat)}
                   </td>
-                  <td className="border border-[#141414]/30 p-0">
-                    <input
-                      type="number"
-                      value={it.SuDung}
-                      onChange={(e) => handleFieldChange(it.rowIndex, 'SuDung', e.target.value)}
-                      onBlur={() => handleFieldBlur(it.rowIndex)}
-                      className="w-16 bg-transparent px-2 py-1 text-right focus:bg-yellow-300 focus:outline-none focus:ring-2 focus:ring-yellow-500"
-                    />
+                  <td className="border border-[#141414]/30 px-2 py-1 text-right font-semibold" title="Tự động tính = (Đầu kỳ + Nhập) − (Tồn + Transfer + Hư hỏng/mất)">
+                    {fmtNumber(it.SuDung)}
                   </td>
 
                   <td className="border border-[#141414]/30 px-2 py-1 text-right font-semibold">{fmtNumber(it.TongXuat)}</td>
@@ -626,10 +621,18 @@ export default function StoreModule() {
             <h3 className="mb-2 text-base font-bold">Xác nhận kết chuyển tháng</h3>
             <p className="mb-4 text-sm text-slate-600">
               Toàn bộ <strong>Tồn</strong> (số bạn đã nhập tay) của tháng <strong>{thang}</strong> sẽ trở
-              thành <strong>Đầu kỳ</strong> của tháng <strong>{nextMonthStr(thang)}</strong>. Các cột Nhập,
-              Transfer, Hư hỏng/mất, Sử dụng, Tồn của tháng mới sẽ được reset về 0 (bạn sẽ nhập lại
-              Tồn sau khi kiểm kê cuối tháng mới). Thao tác này không thể hoàn tác.
+              thành <strong>Đầu kỳ</strong> của tháng <strong>{nextMonthStr(thang)}</strong>. Các ô Nhập,
+              Transfer, Hư hỏng/mất, Sử dụng, Tồn của tháng mới sẽ để <strong>trống</strong> (không phải
+              số 0) để bạn nhập liệu nhanh hơn. <strong>Ghi chú</strong> sẽ được giữ nguyên từ tháng cũ.
+              Thao tác này không thể hoàn tác.
             </p>
+            {rolloverBusy && (
+              <p className="mb-3 flex items-center gap-2 rounded bg-amber-50 px-3 py-2 text-xs font-medium text-amber-700">
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                Đang kết chuyển dữ liệu sang Google Sheets, vui lòng đợi trong giây lát... (có thể mất
+                tới 30-60 giây nếu danh sách nhiều mặt hàng)
+              </p>
+            )}
             <div className="flex justify-end gap-2">
               <button
                 onClick={() => setConfirmRollover(false)}
