@@ -3,7 +3,7 @@ import { StoreProvider } from './context/StoreContext';
 import { Navbar } from './components/layout/Navbar';
 import { Sidebar, ActiveModule } from './components/layout/Sidebar';
 import StoreModule from './components/modules/StoreModule';
-import { Module02PRPO } from './components/modules/Module02PRPO';
+import PRPOModule from './components/modules/PRPOModule';
 import { Module03LossDamage } from './components/modules/Module03LossDamage';
 import { Module04Minibar } from './components/modules/Module04Minibar';
 import { Module05OfficeSupplies } from './components/modules/Module05OfficeSupplies';
@@ -36,7 +36,7 @@ export default function App() {
             <div className="max-w-7xl mx-auto">
               
              {activeModule === 'MODULE_01_STORE' && <StoreModule />}
-              {activeModule === 'MODULE_02_PRPO' && <Module02PRPO />}
+              {activeModule === 'MODULE_02_PRPO' && <PRPOModule />}
               {activeModule === 'MODULE_03_DAMAGE' && <Module03LossDamage />}
               {activeModule === 'MODULE_04_MINIBAR' && <Module04Minibar />}
               {activeModule === 'MODULE_05_VPP' && <Module05OfficeSupplies />}
