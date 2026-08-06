@@ -98,8 +98,3 @@ export function savePRPOItem(thang, item) {
 export function deletePRPOItem(thang, rowIndex) {
   return jsonpRequest({ action: 'deletePRPO', thang, rowIndex });
 }
-
-/** Tự động tính lại PR: gán QTY = Đề Xuất Mua cho toàn bộ danh sách */
-export function recalcPRPO(thang) {
-  return jsonpRequest({ action: 'recalcPRPO', thang }, 30000);
-}
