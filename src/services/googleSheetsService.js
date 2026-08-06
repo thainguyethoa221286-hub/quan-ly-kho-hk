@@ -74,7 +74,32 @@ export function listAvailableMonths() {
   return jsonpRequest({ action: 'listMonths' });
 }
 
-/** Kết chuyển từ tháng hiện tại sang tháng kế tiếp */
+/** Kết chuyển từ tháng hiện tại sang tháng kế tiếp — thao tác này có thể mất
+ * nhiều thời gian hơn bình thường (tạo tab mới + ghi nhiều dòng), nên dùng
+ * thời gian chờ dài hơn (60s) để tránh báo lỗi timeout giả trong khi
+ * Google Sheets vẫn đang xử lý thành công phía sau. */
 export function rolloverMonth(fromThang, toThang) {
-  return jsonpRequest({ action: 'rolloverMonth', fromThang, toThang });
+  return jsonpRequest({ action: 'rolloverMonth', fromThang, toThang }, 60000);
+}
+
+/** ===== Module 02: Đề Xuất Mua Hàng PR-PO ===== */
+
+/** Lấy danh sách PR-PO của 1 tháng (tự đồng bộ mặt hàng mới + StockInHand sống từ Module 01) */
+export function getPRPOData(thang) {
+  return jsonpRequest({ action: 'getPRPO', thang }, 30000);
+}
+
+/** Lưu 1 dòng PR-PO (StockMax, QTY, GhiChu) */
+export function savePRPOItem(thang, item) {
+  return jsonpRequest({ action: 'savePRPO', thang, item: JSON.stringify(item) });
+}
+
+/** Xoá 1 dòng PR-PO */
+export function deletePRPOItem(thang, rowIndex) {
+  return jsonpRequest({ action: 'deletePRPO', thang, rowIndex });
+}
+
+/** Tự động tính lại PR: gán QTY = Đề Xuất Mua cho toàn bộ danh sách */
+export function recalcPRPO(thang) {
+  return jsonpRequest({ action: 'recalcPRPO', thang }, 30000);
 }
