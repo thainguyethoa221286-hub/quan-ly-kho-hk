@@ -1,20 +1,23 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { ShoppingCart, Download, Printer, Loader2, X, AlertTriangle, Plus, Search, ChevronDown } from 'lucide-react';
+import { ShoppingCart, Download, Printer, Loader2, X, AlertTriangle, Plus, Search, ChevronDown, EyeOff } from 'lucide-react';
 import * as XLSX from 'xlsx-js-style';
 import { useStore } from '../../context/StoreContext';
 import {
   getKhoData,
   getPRPOData,
   savePRPOItem,
-  deletePRPOItem,
+  setPRPOHidden,
+  addNewItemFull,
 } from '../../services/googleSheetsService';
 
 const fmtNumber = (v) => (Number(v) || 0).toLocaleString('vi-VN');
 
-// ---------- Modal: Thêm Mặt Hàng PR (chọn từ danh mục Kho Store) ----------
-function AddItemModal({ storeItems, existingNames, onCancel, onConfirm }) {
+// ---------- Modal: Thêm Mặt Hàng PR (chọn từ danh mục Kho Store, hoặc tạo mới) ----------
+function AddItemModal({ storeItems, existingNames, onCancel, onConfirm, onCreateNew }) {
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState(new Set());
+  const [newDvt, setNewDvt] = useState('');
+  const [creating, setCreating] = useState(false);
 
   const available = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -25,6 +28,12 @@ function AddItemModal({ storeItems, existingNames, onCancel, onConfirm }) {
     });
   }, [storeItems, existingNames, search]);
 
+  const exactMatchExists = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    if (!term) return true;
+    return storeItems.some((it) => String(it.TenHang || '').toLowerCase() === term);
+  }, [storeItems, search]);
+
   const toggle = (tenHang) => {
     setSelected((prev) => {
       const next = new Set(prev);
@@ -34,20 +43,56 @@ function AddItemModal({ storeItems, existingNames, onCancel, onConfirm }) {
     });
   };
 
+  const handleCreate = async () => {
+    setCreating(true);
+    try {
+      await onCreateNew(search.trim(), newDvt.trim());
+    } finally {
+      setCreating(false);
+    }
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 print:hidden">
       <div className="flex max-h-[80vh] w-[480px] flex-col rounded-lg bg-white p-5 shadow-xl">
-        <h3 className="mb-3 text-base font-bold">Thêm Mặt Hàng PR từ Kho</h3>
+        <h3 className="mb-3 text-base font-bold">Thêm Mặt Hàng PR</h3>
         <div className="relative mb-3">
           <Search className="pointer-events-none absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
           <input
             autoFocus
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Tìm tên mặt hàng trong Kho..."
+            placeholder="Tìm tên mặt hàng trong Kho, hoặc gõ tên mới..."
             className="w-full rounded border border-slate-300 py-1.5 pl-8 pr-3 text-sm focus:outline-none"
           />
         </div>
+
+        {/* Tạo mặt hàng hoàn toàn mới nếu gõ tên chưa từng có trong Kho */}
+        {search.trim() && !exactMatchExists && (
+          <div className="mb-3 rounded border border-amber-300 bg-amber-50 p-3">
+            <p className="mb-2 text-xs text-amber-700">
+              "<strong>{search.trim()}</strong>" chưa có trong Kho. Bạn có thể tạo mặt hàng mới — hệ
+              thống sẽ tự thêm vào cả Module 01 (Kho) và danh sách PR-PO này.
+            </p>
+            <div className="flex gap-2">
+              <input
+                value={newDvt}
+                onChange={(e) => setNewDvt(e.target.value)}
+                placeholder="ĐVT (VD: cái, hộp...)"
+                className="flex-1 rounded border border-amber-300 px-2 py-1.5 text-sm focus:outline-none"
+              />
+              <button
+                onClick={handleCreate}
+                disabled={creating || !newDvt.trim()}
+                className="flex items-center gap-1 whitespace-nowrap rounded bg-amber-600 px-3 py-1.5 text-sm font-bold text-white disabled:opacity-40"
+              >
+                {creating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+                Tạo mặt hàng mới
+              </button>
+            </div>
+          </div>
+        )}
+
         <div className="flex-1 overflow-y-auto rounded border border-slate-200">
           {available.length === 0 ? (
             <p className="p-4 text-center text-sm text-slate-400">
@@ -87,6 +132,33 @@ function AddItemModal({ storeItems, existingNames, onCancel, onConfirm }) {
   );
 }
 
+// ---------- Popover: Mặt hàng đã ẩn (khôi phục lại) ----------
+function HiddenItemsPanel({ hiddenItems, onRestore, onClose }) {
+  return (
+    <div className="absolute right-0 top-full z-30 mt-1 w-80 max-h-72 overflow-y-auto rounded border border-slate-300 bg-white shadow-xl print:hidden">
+      <div className="flex items-center justify-between border-b border-slate-200 px-3 py-2">
+        <p className="text-xs font-bold text-slate-600">Mặt hàng đã ẩn</p>
+        <button onClick={onClose}><X className="h-4 w-4 text-slate-400" /></button>
+      </div>
+      {hiddenItems.length === 0 ? (
+        <p className="p-4 text-center text-sm text-slate-400">Không có mặt hàng nào đang ẩn.</p>
+      ) : (
+        hiddenItems.map((it) => (
+          <div key={it.rowIndex} className="flex items-center justify-between border-b border-slate-100 px-3 py-2 text-sm last:border-0">
+            <span className="flex-1 text-slate-500 line-through">{it.TenHang}</span>
+            <button
+              onClick={() => onRestore(it.rowIndex)}
+              className="ml-2 whitespace-nowrap rounded border border-[#141414] px-2 py-1 text-[11px] font-bold hover:bg-[#E4E3E0]"
+            >
+              Khôi phục
+            </button>
+          </div>
+        ))
+      )}
+    </div>
+  );
+}
+
 export default function PRPOModule() {
   const { selectedMonth } = useStore();
   const thang = selectedMonth;
@@ -98,6 +170,7 @@ export default function PRPOModule() {
   const [savingRows, setSavingRows] = useState({});
   const [showAddModal, setShowAddModal] = useState(false);
   const [showUrgentList, setShowUrgentList] = useState(false);
+  const [showHiddenPanel, setShowHiddenPanel] = useState(false);
   const urgentRef = useRef(null);
 
   const loadData = useCallback(async (month) => {
@@ -127,11 +200,14 @@ export default function PRPOModule() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  const visibleItems = useMemo(() => items.filter((it) => !it.Hidden), [items]);
+  const hiddenItems = useMemo(() => items.filter((it) => it.Hidden), [items]);
+
   const totals = useMemo(() => {
-    const sumDeXuat = items.reduce((acc, it) => acc + (Number(it.DeXuatMua) || 0), 0);
-    const urgentItems = items.filter((it) => (Number(it.StockInHand) || 0) <= 0);
+    const sumDeXuat = visibleItems.reduce((acc, it) => acc + (Number(it.DeXuatMua) || 0), 0);
+    const urgentItems = visibleItems.filter((it) => (Number(it.StockInHand) || 0) <= 0);
     return { sumDeXuat, urgentItems };
-  }, [items]);
+  }, [visibleItems]);
 
   const existingNames = useMemo(() => new Set(items.map((it) => it.TenHang)), [items]);
 
@@ -207,13 +283,35 @@ export default function PRPOModule() {
     }
   };
 
-  const handleDeleteRow = async (rowIndex) => {
-    if (!window.confirm('Xoá mặt hàng này khỏi danh sách PR-PO?')) return;
+  // Tạo mặt hàng hoàn toàn mới — tự thêm vào cả Module 01 (Kho) và Module 02 (PR-PO)
+  const handleCreateNewItem = async (tenHang, dvt) => {
+    if (!tenHang || !dvt) return;
     try {
-      await deletePRPOItem(thang, rowIndex);
-      setItems((prev) => prev.filter((x) => x.rowIndex !== rowIndex));
+      await addNewItemFull(thang, tenHang, dvt);
+      setShowAddModal(false);
+      await loadData(thang);
     } catch (err) {
-      setError('Lỗi khi xoá: ' + err.message);
+      setError('Lỗi khi tạo mặt hàng mới: ' + err.message);
+    }
+  };
+
+  // "Xoá" ở giao diện = ẨN, không xoá dòng thật trên Sheet (tránh lệch dữ liệu
+  // giữa Module 01 và Module 02). Có thể khôi phục lại qua bảng "Mặt hàng đã ẩn".
+  const handleHideRow = async (rowIndex) => {
+    try {
+      await setPRPOHidden(thang, rowIndex, true);
+      setItems((prev) => prev.map((it) => (it.rowIndex === rowIndex ? { ...it, Hidden: true } : it)));
+    } catch (err) {
+      setError('Lỗi khi ẩn mặt hàng: ' + err.message);
+    }
+  };
+
+  const handleRestoreRow = async (rowIndex) => {
+    try {
+      await setPRPOHidden(thang, rowIndex, false);
+      setItems((prev) => prev.map((it) => (it.rowIndex === rowIndex ? { ...it, Hidden: false } : it)));
+    } catch (err) {
+      setError('Lỗi khi khôi phục mặt hàng: ' + err.message);
     }
   };
 
@@ -235,7 +333,7 @@ export default function PRPOModule() {
     aoa.push([]);
     aoa.push(headers);
     const dataStartRow = aoa.length;
-    items.forEach((it) => {
+    visibleItems.forEach((it) => {
       aoa.push([it.Stt, it.TenHang, it.DVT, it.StockInHand, it.StockMax, it.DeXuatMua, it.GhiChu]);
     });
     const dataEndRow = aoa.length - 1;
@@ -336,6 +434,21 @@ export default function PRPOModule() {
           >
             <Plus className="h-3.5 w-3.5" /> Thêm Mặt Hàng PR
           </button>
+          <div className="relative">
+            <button
+              onClick={() => setShowHiddenPanel((s) => !s)}
+              className="flex items-center gap-1 rounded border border-[#141414] bg-white px-3 py-1.5 text-xs font-bold hover:bg-[#E4E3E0]"
+            >
+              Mặt Hàng Đã Ẩn {hiddenItems.length > 0 ? `(${hiddenItems.length})` : ''}
+            </button>
+            {showHiddenPanel && (
+              <HiddenItemsPanel
+                hiddenItems={hiddenItems}
+                onRestore={handleRestoreRow}
+                onClose={() => setShowHiddenPanel(false)}
+              />
+            )}
+          </div>
           <button
             onClick={handleExportExcel}
             className="flex items-center gap-1 rounded bg-[#141414] px-3 py-1.5 text-xs font-bold text-white hover:bg-slate-800"
@@ -424,14 +537,14 @@ export default function PRPOModule() {
                   <Loader2 className="mx-auto h-5 w-5 animate-spin" /> Đang tải dữ liệu...
                 </td>
               </tr>
-            ) : items.length === 0 ? (
+            ) : visibleItems.length === 0 ? (
               <tr>
                 <td colSpan={8} className="py-8 text-center text-slate-400">
                   Chưa có mặt hàng đề xuất. Bấm "+ Thêm Mặt Hàng PR" để chọn mặt hàng từ Kho.
                 </td>
               </tr>
             ) : (
-              items.map((it) => {
+              visibleItems.map((it) => {
                 const isUrgent = (Number(it.StockInHand) || 0) <= 0;
                 return (
                   <tr key={it.rowIndex} className={savingRows[it.rowIndex] ? 'opacity-50' : isUrgent ? 'bg-red-50/50' : ''}>
@@ -471,14 +584,20 @@ export default function PRPOModule() {
                     </td>
 
                     <td className="border border-[#141414]/30 px-1 py-1 text-center print:hidden">
-                      <button onClick={() => handleDeleteRow(it.rowIndex)} className="text-red-500 hover:text-red-700">×</button>
+                      <button
+                        onClick={() => handleHideRow(it.rowIndex)}
+                        title="Ẩn mặt hàng này khỏi danh sách (không xoá dữ liệu, có thể khôi phục lại)"
+                        className="text-slate-400 hover:text-red-500"
+                      >
+                        <EyeOff className="h-3.5 w-3.5" />
+                      </button>
                     </td>
                   </tr>
                 );
               })
             )}
           </tbody>
-          {items.length > 0 && (
+          {visibleItems.length > 0 && (
             <tfoot className="bg-[#F2F1EE] font-bold">
               <tr>
                 <td colSpan={5} className="border border-[#141414]/30 px-2 py-2">TỔNG CỘNG</td>
@@ -512,6 +631,7 @@ export default function PRPOModule() {
           existingNames={existingNames}
           onCancel={() => setShowAddModal(false)}
           onConfirm={handleAddItems}
+          onCreateNew={handleCreateNewItem}
         />
       )}
     </div>
