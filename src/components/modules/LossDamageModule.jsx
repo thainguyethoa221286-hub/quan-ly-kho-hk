@@ -157,10 +157,16 @@ function AddDamageModal({ catalog, onCancel, onConfirm }) {
           <input
             value={form.SoTien}
             onChange={set('SoTien')}
+            onBlur={() => setForm((f) => ({ ...f, SoTien: f.SoTien ? fmtNumber(parseAmount(f.SoTien)) : '' }))}
             placeholder="VD: 10.000 hoặc 10000"
             inputMode="numeric"
             className="w-full rounded border border-slate-300 px-2 py-2 text-sm focus:outline-none"
           />
+          {form.SoTien !== '' && (
+            <p className="mt-1 text-[11px] text-slate-400">
+              Số tiền sẽ ghi nhận: <strong className="text-slate-600">{fmtNumber(parseAmount(form.SoTien))} đ</strong>
+            </p>
+          )}
         </div>
 
         <div className="mt-4">
@@ -195,6 +201,7 @@ export default function LossDamageModule() {
   const thang = selectedMonth;
 
   const [items, setItems] = useState([]);
+  const [editingCell, setEditingCell] = useState(null); // "rowIndex-field" đang được focus
   const [catalog, setCatalog] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -476,25 +483,31 @@ export default function LossDamageModule() {
                   </td>
                   <td className="border border-[#141414]/30 p-0">
                     <input
-                      value={it.ThuKhach || ''}
+                      value={editingCell === `${it.rowIndex}-ThuKhach` ? (it.ThuKhach ?? '') : (it.ThuKhach ? fmtNumber(it.ThuKhach) : '')}
                       onChange={(e) => handleFieldChange(it.rowIndex, 'ThuKhach', e.target.value)}
+                      onFocus={() => setEditingCell(`${it.rowIndex}-ThuKhach`)}
                       onBlur={() => {
                         handleFieldChange(it.rowIndex, 'ThuKhach', parseAmount(it.ThuKhach));
+                        setEditingCell(null);
                         persistRow(it.rowIndex);
                       }}
                       inputMode="numeric"
+                      placeholder="0"
                       className="w-24 bg-transparent px-2 py-1 text-right text-teal-600 focus:bg-yellow-300 focus:outline-none focus:ring-2 focus:ring-yellow-500"
                     />
                   </td>
                   <td className="border border-[#141414]/30 p-0">
                     <input
-                      value={it.FOCCost || ''}
+                      value={editingCell === `${it.rowIndex}-FOCCost` ? (it.FOCCost ?? '') : (it.FOCCost ? fmtNumber(it.FOCCost) : '')}
                       onChange={(e) => handleFieldChange(it.rowIndex, 'FOCCost', e.target.value)}
+                      onFocus={() => setEditingCell(`${it.rowIndex}-FOCCost`)}
                       onBlur={() => {
                         handleFieldChange(it.rowIndex, 'FOCCost', parseAmount(it.FOCCost));
+                        setEditingCell(null);
                         persistRow(it.rowIndex);
                       }}
                       inputMode="numeric"
+                      placeholder="0"
                       className="w-24 bg-transparent px-2 py-1 text-right text-red-500 focus:bg-yellow-300 focus:outline-none focus:ring-2 focus:ring-yellow-500"
                     />
                   </td>
