@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Package, ShoppingCart, AlertTriangle, Coffee, FileText, 
   BarChart3, ChevronLeft, ChevronRight
 } from 'lucide-react';
 import { useStore } from '../../context/StoreContext';
+import { getMinibarSummary } from '../../services/googleSheetsService';
 
 export type ActiveModule = 'MODULE_01_STORE' | 'MODULE_02_PRPO' | 'MODULE_03_DAMAGE' | 'MODULE_04_MINIBAR' | 'MODULE_05_VPP' | 'MODULE_06_DASHBOARD';
 
@@ -20,15 +21,23 @@ export const Sidebar: React.FC<SidebarProps> = ({
   isCollapsed,
   setIsCollapsed
 }) => {
-  const { minibarItems, roomSetups } = useStore();
+  const { selectedMonth } = useStore();
+  const [hasMinibarDiscrepancy, setHasMinibarDiscrepancy] = useState(false);
 
-  // Chỉ còn giữ lại cảnh báo lệch kiểm kê Minibar (module 04)
-  const minibarDiscrepancies = minibarItems.filter(item => {
-    const setupStock = roomSetups.reduce((acc, room) => acc + (room.itemQuantities[item.code] || 0), 0);
-    const bookEnd = item.openingStock + item.incomingQty - item.billedQty - item.focQty - item.transferFOQty - item.transferFBQty;
-    const actual = item.warehouseStock + setupStock;
-    return bookEnd !== actual;
-  }).length;
+  // Lấy dữ liệu Minibar THẬT từ Google Sheets để quyết định có hiện icon cảnh báo hay không
+  useEffect(() => {
+    let cancelled = false;
+    getMinibarSummary(selectedMonth)
+      .then((data: any[]) => {
+        if (cancelled) return;
+        const mismatched = data.some((it) => Number(it.ChenhLech) !== 0);
+        setHasMinibarDiscrepancy(mismatched);
+      })
+      .catch(() => {
+        if (!cancelled) setHasMinibarDiscrepancy(false);
+      });
+    return () => { cancelled = true; };
+  }, [selectedMonth]);
 
   const navItems = [
     {
@@ -61,7 +70,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       title: 'Minibar & Setup Phòng',
       subtitle: 'Bill daily, khay setup & báo cáo tổng',
       icon: Coffee,
-      showWarning: minibarDiscrepancies > 0,
+      showWarning: hasMinibarDiscrepancy,
     },
     {
       id: 'MODULE_05_VPP' as ActiveModule,
