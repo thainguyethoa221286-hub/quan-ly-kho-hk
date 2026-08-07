@@ -264,7 +264,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     };
 
     setUserProfile({
-      name: role === 'HK_MANAGER' ? 'Trần Thị Mỹ Hoa' : role === 'STOREKEEPER' ? 'Nguyễn Văn Nam' : role === 'HK_SUPERVISOR' ? 'Phạm Hồng Nhung' : 'Lê Thị Thu Hương',
+      name: role === 'HK_MANAGER' ? 'Thái Nguyệt Hoa Hoa' : role === 'STOREKEEPER' ? 'Hồ Phạm Minh Châu' : role === 'HK_SUPERVISOR' ? 'HK SUP' : 'Giám sát',
       role,
       title: titles[role].title,
       department: titles[role].dept
