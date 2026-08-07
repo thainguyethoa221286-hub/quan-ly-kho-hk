@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { Search, Plus, Trash2, Download, Printer, RefreshCw, Loader2, X } from 'lucide-react';
+import { Search, Plus, Trash2, Download, Printer, RefreshCw, Loader2, X, Eye, EyeOff, AlertTriangle } from 'lucide-react';
 import * as XLSX from 'xlsx-js-style';
 import { useStore } from '../../context/StoreContext';
 import {
@@ -162,6 +162,8 @@ export default function StoreModule() {
   const [savingRows, setSavingRows] = useState({});
   const [searchTerm, setSearchTerm] = useState('');
   const [showAddRow, setShowAddRow] = useState(false);
+  const [showDeleteColumn, setShowDeleteColumn] = useState(false);
+  const [confirmDeleteItem, setConfirmDeleteItem] = useState(null);
   const [rolloverBusy, setRolloverBusy] = useState(false);
   const [confirmRollover, setConfirmRollover] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
@@ -256,10 +258,10 @@ export default function StoreModule() {
   };
 
   const handleDelete = async (rowIndex) => {
-    if (!window.confirm('Xoá mặt hàng này khỏi bảng kho?')) return;
     try {
       await deleteKhoItem(thang, rowIndex);
       setItems((prev) => prev.filter((it) => it.rowIndex !== rowIndex));
+      setConfirmDeleteItem(null);
     } catch (err) {
       setError('Lỗi khi xoá: ' + err.message);
     }
@@ -478,6 +480,16 @@ export default function StoreModule() {
           </button>
           {canEdit && (
             <button
+              onClick={() => setShowDeleteColumn((s) => !s)}
+              title={showDeleteColumn ? 'Ẩn cột Xoá' : 'Hiện cột Xoá'}
+              className={`flex items-center gap-1 rounded border border-[#141414] px-3 py-1.5 text-xs font-bold ${showDeleteColumn ? 'bg-red-500 text-white hover:bg-red-600' : 'bg-white hover:bg-[#E4E3E0]'}`}
+            >
+              {showDeleteColumn ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
+              {showDeleteColumn ? 'Đang hiện cột Xoá' : 'Hiện cột Xoá'}
+            </button>
+          )}
+          {canEdit && (
+            <button
               onClick={() => setConfirmRollover(true)}
               className="flex items-center gap-1 rounded bg-[#10B981] px-3 py-1.5 text-xs font-bold text-white hover:bg-emerald-700"
             >
@@ -502,13 +514,16 @@ export default function StoreModule() {
       {/* ---- Table ---- */}
       <div className="max-h-[calc(100vh-160px)] overflow-y-auto overflow-x-auto rounded border border-[#141414] bg-white">
         <table className="w-full border-collapse text-xs">
-          <thead className="bg-[#F2F1EE] font-mono uppercase text-[10px] text-[#141414]">
+          <thead className="bg-slate-700 font-mono uppercase text-[10px] text-white">
             <tr>
-              {['STT', 'Tên mặt hàng', 'ĐVT', 'Đầu kỳ', 'Set up', 'Nhập', 'Transfer',
-                'Hư hỏng/mất', 'Sử dụng', 'Tổng xuất', 'Tồn/Cuối kỳ', 'Tổng Kho', 'Ghi chú', ''].map((h, i) => (
+              {[
+                'STT', 'Tên mặt hàng', 'ĐVT', 'Đầu kỳ', 'Set up', 'Nhập', 'Transfer',
+                'Hư hỏng/mất', 'Sử dụng', 'Tổng xuất', 'Tồn/Cuối kỳ', 'Tổng Kho', 'Ghi chú',
+                ...(canEdit && showDeleteColumn ? ['Xoá'] : []),
+              ].map((h, i) => (
                 <th
                   key={h + i}
-                  className={`sticky top-0 z-20 border border-[#141414]/30 bg-[#F2F1EE] px-2 py-2 text-left shadow-[0_1px_0_0_#141414] ${i === 1 ? 'min-w-[280px]' : ''}`}
+                  className={`sticky top-0 z-20 border border-white/20 bg-slate-700 px-2 py-2 text-left shadow-[0_1px_0_0_#141414] ${i === 1 ? 'min-w-[280px]' : ''}`}
                 >
                   {h}
                 </th>
@@ -527,8 +542,11 @@ export default function StoreModule() {
                 <td colSpan={14} className="py-8 text-center text-slate-400">Chưa có dữ liệu.</td>
               </tr>
             ) : (
-              filteredItems.map((it) => (
-                <tr key={it.rowIndex} className={savingRows[it.rowIndex] ? 'opacity-50' : ''}>
+              filteredItems.map((it, idx) => (
+                <tr
+                  key={it.rowIndex}
+                  className={`transition-colors hover:bg-amber-50 ${savingRows[it.rowIndex] ? 'opacity-50' : idx % 2 === 0 ? 'bg-white' : 'bg-slate-50'}`}
+                >
                   <td className="border border-[#141414]/30 px-2 py-1">{it.Stt}</td>
                   <td
                     className={`min-w-[280px] border px-2 py-1 font-medium transition-colors ${
@@ -616,13 +634,13 @@ export default function StoreModule() {
                     />
                   </td>
 
-                  <td className="border border-[#141414]/30 px-1 py-1 text-center print:hidden">
-                    {canEdit && (
-                      <button onClick={() => handleDelete(it.rowIndex)} className="text-red-500 hover:text-red-700">
+                  {canEdit && showDeleteColumn && (
+                    <td className="border border-[#141414]/30 px-1 py-1 text-center print:hidden">
+                      <button onClick={() => setConfirmDeleteItem(it)} className="text-red-500 hover:text-red-700">
                         <Trash2 className="h-3.5 w-3.5" />
                       </button>
-                    )}
-                  </td>
+                    </td>
+                  )}
                 </tr>
               ))
             )}
@@ -710,6 +728,34 @@ export default function StoreModule() {
               >
                 {rolloverBusy && <Loader2 className="h-4 w-4 animate-spin" />}
                 Xác nhận kết chuyển
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {confirmDeleteItem && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 print:hidden">
+          <div className="w-96 rounded-lg bg-white p-5 shadow-xl">
+            <h3 className="mb-2 flex items-center gap-2 text-base font-bold text-red-600">
+              <AlertTriangle className="h-5 w-5" /> Xác Nhận Xoá Mặt Hàng
+            </h3>
+            <p className="mb-4 text-sm text-slate-600">
+              Bạn có chắc chắn muốn xoá mặt hàng <strong>"{confirmDeleteItem.TenHang}"</strong> khỏi kho
+              không? Thao tác này sẽ cập nhật về Google Sheets và không thể hoàn tác.
+            </p>
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setConfirmDeleteItem(null)}
+                className="rounded border border-[#141414] px-3 py-1.5 text-sm"
+              >
+                Huỷ
+              </button>
+              <button
+                onClick={() => handleDelete(confirmDeleteItem.rowIndex)}
+                className="rounded bg-red-600 px-3 py-1.5 text-sm font-bold text-white hover:bg-red-700"
+              >
+                Xác Nhận Xoá
               </button>
             </div>
           </div>
