@@ -1,7 +1,7 @@
 import React from 'react';
 import { 
   Package, ShoppingCart, AlertTriangle, Coffee, FileText, 
-  BarChart3, ChevronLeft, ChevronRight, CheckCircle2, ShieldAlert 
+  BarChart3, ChevronLeft, ChevronRight
 } from 'lucide-react';
 import { useStore } from '../../context/StoreContext';
 
@@ -20,12 +20,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
   isCollapsed,
   setIsCollapsed
 }) => {
-  const { storeItems, prItems, damageRecords, minibarItems, roomSetups, vppItems, isMonthLocked } = useStore();
+  const { minibarItems, roomSetups } = useStore();
 
-  // Helper count for badges
-  const lowStockCount = storeItems.filter(i => (i.currentWarehouseStock + i.setupQty) <= i.minParLevel).length;
-  
-  // Calculate minibar discrepancy count
+  // Chỉ còn giữ lại cảnh báo lệch kiểm kê Minibar (module 04)
   const minibarDiscrepancies = minibarItems.filter(item => {
     const setupStock = roomSetups.reduce((acc, room) => acc + (room.itemQuantities[item.code] || 0), 0);
     const bookEnd = item.openingStock + item.incomingQty - item.billedQty - item.focQty - item.transferFOQty - item.transferFBQty;
@@ -40,8 +37,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       title: 'Kho HK & Vật Tư',
       subtitle: 'Quản lý kho nhập - xuất - tồn vật tư',
       icon: Package,
-      badge: storeItems.length.toString(),
-      badgeColor: 'bg-[#E4E3E0] text-[#141414] border border-[#141414]'
+      showWarning: false,
     },
     {
       id: 'MODULE_02_PRPO' as ActiveModule,
@@ -49,8 +45,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       title: 'Đề Xuất Mua Hàng PR-PO',
       subtitle: 'Tự động tính toán lượng PR đề xuất',
       icon: ShoppingCart,
-      badge: lowStockCount > 0 ? `${lowStockCount} thiếu` : 'Đủ tồn',
-      badgeColor: lowStockCount > 0 ? 'bg-[#FF4444] text-white font-bold' : 'bg-[#10B981] text-white'
+      showWarning: false,
     },
     {
       id: 'MODULE_03_DAMAGE' as ActiveModule,
@@ -58,8 +53,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       title: 'Báo Cáo Hư Hỏng / FOC',
       subtitle: 'Ghi nhận thiệt hại & thu tiền đền bù',
       icon: AlertTriangle,
-      badge: `${damageRecords.length} ca`,
-      badgeColor: damageRecords.length > 0 ? 'bg-[#141414] text-white' : 'bg-[#E4E3E0] text-[#141414]'
+      showWarning: false,
     },
     {
       id: 'MODULE_04_MINIBAR' as ActiveModule,
@@ -67,8 +61,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       title: 'Minibar & Setup Phòng',
       subtitle: 'Bill daily, khay setup & báo cáo tổng',
       icon: Coffee,
-      badge: minibarDiscrepancies > 0 ? `⚠️ ${minibarDiscrepancies} lệch` : '🟢 Khớp',
-      badgeColor: minibarDiscrepancies > 0 ? 'bg-[#FF4444] text-white font-bold animate-pulse' : 'bg-[#10B981] text-white font-bold'
+      showWarning: minibarDiscrepancies > 0,
     },
     {
       id: 'MODULE_05_VPP' as ActiveModule,
@@ -76,8 +69,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       title: 'Văn Phòng Phẩm (VPP)',
       subtitle: 'Theo dõi chi phí VPP bộ phận HK',
       icon: FileText,
-      badge: `${vppItems.length} mục`,
-      badgeColor: 'bg-[#E4E3E0] text-[#141414] border border-[#141414]'
+      showWarning: false,
     },
     {
       id: 'MODULE_06_DASHBOARD' as ActiveModule,
@@ -85,8 +77,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       title: 'Báo Cáo Tháng Tổng Hợp',
       subtitle: 'Dashboard KPI, xem nhanh & xuất Excel',
       icon: BarChart3,
-      badge: isMonthLocked ? 'Khóa Sổ' : 'Báo Cáo',
-      badgeColor: isMonthLocked ? 'bg-purple-900 text-white font-bold' : 'bg-[#141414] text-white font-bold'
+      showWarning: false,
     }
   ];
 
@@ -143,11 +134,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         <span className="font-mono opacity-80 mr-1">{item.num}.</span>
                         {item.title}
                       </span>
-                      <span className={`text-[10px] font-mono px-1.5 py-0.5 border border-[#141414] font-bold ${
-                        isActive ? 'bg-[#E4E3E0] text-[#141414]' : item.badgeColor
-                      }`}>
-                        {item.badge}
-                      </span>
+                      {item.showWarning && (
+                        <AlertTriangle className="w-4 h-4 text-red-500 shrink-0 animate-pulse" />
+                      )}
                     </div>
                     <p className={`text-[10px] truncate mt-0.5 ${isActive ? 'text-slate-300 font-normal' : 'text-slate-600'}`}>
                       {item.subtitle}
@@ -159,23 +148,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
           })}
         </nav>
       </div>
-
-      {/* Footer Info Box */}
-      {!isCollapsed && (
-        <div className="p-3 m-2 bg-white border border-[#141414] text-xs space-y-2">
-          <div className="flex items-center gap-2 text-[#141414] font-bold font-mono">
-            <CheckCircle2 className="w-4 h-4 text-[#10B981]" />
-            <span>EXCEL 2026 & A4 PRINT</span>
-          </div>
-          <p className="text-[11px] text-slate-700 leading-normal font-sans">
-            Chuẩn hóa biểu mẫu 5 sao. Phím tắt Tab/Enter linh hoạt khi nhập dữ liệu.
-          </p>
-          <div className="pt-2 border-t border-[#141414] flex items-center justify-between text-[10px] font-mono text-slate-600">
-            <span>VER: v2.6 TECHNICAL</span>
-            <span>OK: 100%</span>
-          </div>
-        </div>
-      )}
 
     </aside>
   );
