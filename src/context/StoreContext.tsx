@@ -13,7 +13,7 @@ import { getMonthLockStatus, setMonthLockStatus } from '../services/googleSheets
 // ⚠️ MẬT KHẨU CHẾ ĐỘ QUẢN LÝ — đổi trực tiếp chuỗi này nếu muốn đổi mật khẩu.
 // Ai gõ đúng mật khẩu này sẽ chuyển App sang chế độ "Quản Lý" (sửa được dữ liệu).
 // Mặc định App luôn mở ở chế độ "Chỉ Xem" cho tới khi mở khoá.
-const MANAGER_PASSWORD = 'MHOTEL2026';
+const MANAGER_PASSWORD = '3939';
 
 interface StoreContextType {
   selectedMonth: string; // e.g. "2026-07"
