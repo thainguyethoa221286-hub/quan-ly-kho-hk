@@ -69,7 +69,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [selectedMonth, setSelectedMonth] = useState<string>('2026-07');
   
   const [userProfile, setUserProfile] = useState<UserProfile>({
-    name: 'Trần Thị Mỹ Hoa',
+    name: 'Thái Nguyệt Hoa',
     role: 'HK_MANAGER',
     title: 'Trưởng Bộ Phận Buồng Phòng (HK Manager)',
     department: 'Housekeeping & Store Dept'
