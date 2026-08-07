@@ -173,3 +173,17 @@ export function saveMinibarSummaryItem(thang, item) {
 export function rolloverMinibarMonth(fromThang, toThang) {
   return jsonpRequest({ action: 'rolloverMinibarMonth', fromThang, toThang }, 60000);
 }
+
+/** ===== Module 05: Văn Phòng Phẩm (VPP) ===== */
+export function getVPPData(thang) {
+  return jsonpRequest({ action: 'getVPPData', thang });
+}
+export function saveVPPItem(thang, item) {
+  return jsonpRequest({ action: 'saveVPPItem', thang, item: JSON.stringify(item) });
+}
+export function deleteVPPItem(thang, rowIndex) {
+  return jsonpRequest({ action: 'deleteVPPItem', thang, rowIndex });
+}
+export function rolloverVPPMonth(fromThang, toThang) {
+  return jsonpRequest({ action: 'rolloverVPPMonth', fromThang, toThang }, 60000);
+}
