@@ -8,6 +8,12 @@ import {
   INITIAL_ROOM_SETUPS, INITIAL_DAMAGE_RECORDS, 
   INITIAL_VPP_ITEMS, INITIAL_DAILY_BILLS 
 } from '../data/mockData';
+import { getMonthLockStatus, setMonthLockStatus } from '../services/googleSheetsService';
+
+// ⚠️ MẬT KHẨU CHẾ ĐỘ QUẢN LÝ — đổi trực tiếp chuỗi này nếu muốn đổi mật khẩu.
+// Ai gõ đúng mật khẩu này sẽ chuyển App sang chế độ "Quản Lý" (sửa được dữ liệu).
+// Mặc định App luôn mở ở chế độ "Chỉ Xem" cho tới khi mở khoá.
+const MANAGER_PASSWORD = 'MHOTEL2026';
 
 interface StoreContextType {
   selectedMonth: string; // e.g. "2026-07"
@@ -47,6 +53,12 @@ interface StoreContextType {
   lockedMonths: Record<string, MonthlyReportLock>;
   toggleLockMonth: (month: string) => void;
   isMonthLocked: boolean;
+
+  // Phân quyền: Chế độ Quản Lý (sửa được) vs Chỉ Xem
+  isManagerMode: boolean;
+  unlockManager: (password: string) => boolean;
+  lockManagerSession: () => void;
+  canEdit: boolean; // = isManagerMode && !isMonthLocked (dùng để khoá input ở mọi module)
 
   resetToDefaults: () => void;
 }
@@ -122,22 +134,49 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return saved ? JSON.parse(saved) : INITIAL_VPP_ITEMS;
   });
 
-  const [lockedMonths, setLockedMonths] = useState<Record<string, MonthlyReportLock>>(() => {
-    const saved = localStorage.getItem('hk_locked_months');
-    return saved ? JSON.parse(saved) : {
-      '2026-06': {
-        month: '2026-06',
-        isLocked: true,
-        lockedAt: '2026-07-01 08:30',
-        lockedBy: 'Trần Thị Mỹ Hoa (HK Manager)',
-        totalMinibarRevenue: 42500000,
-        totalDamageCost: 3100000,
-        totalPRPOValue: 98000000,
-        totalInventoryValuation: 312000000,
-        discrepancyCount: 0
-      }
-    };
+  const [lockedMonths, setLockedMonths] = useState<Record<string, MonthlyReportLock>>({});
+
+  // ---- Phân quyền: Chế độ Quản Lý (localStorage, tồn tại tới khi tự khoá lại) ----
+  const [isManagerMode, setIsManagerMode] = useState<boolean>(() => {
+    return localStorage.getItem('hk_manager_mode') === 'true';
   });
+
+  const unlockManager = (password: string): boolean => {
+    if (password === MANAGER_PASSWORD) {
+      setIsManagerMode(true);
+      localStorage.setItem('hk_manager_mode', 'true');
+      return true;
+    }
+    return false;
+  };
+
+  const lockManagerSession = () => {
+    setIsManagerMode(false);
+    localStorage.removeItem('hk_manager_mode');
+  };
+
+  // ---- Khoá Sổ Tháng THẬT — lưu trên Google Sheets, áp dụng cho mọi người ----
+  const [isMonthLocked, setIsMonthLockedReal] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    getMonthLockStatus(selectedMonth)
+      .then((res: { locked: boolean }) => { if (!cancelled) setIsMonthLockedReal(Boolean(res.locked)); })
+      .catch(() => { if (!cancelled) setIsMonthLockedReal(false); });
+    return () => { cancelled = true; };
+  }, [selectedMonth]);
+
+  const toggleLockMonth = async (month: string) => {
+    if (!isManagerMode) return; // an toàn: chỉ Quản lý mới được khoá/mở khoá
+    try {
+      const res: { locked: boolean } = await setMonthLockStatus(month, !isMonthLocked);
+      if (month === selectedMonth) setIsMonthLockedReal(Boolean(res.locked));
+    } catch (e) {
+      console.error('Lỗi khi đổi trạng thái khoá sổ:', e);
+    }
+  };
+
+  const canEdit = isManagerMode && !isMonthLocked;
 
   // Save to LocalStorage whenever state changes
   useEffect(() => {
@@ -167,10 +206,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   useEffect(() => {
     localStorage.setItem('hk_vpp_items', JSON.stringify(vppItems));
   }, [vppItems]);
-
-  useEffect(() => {
-    localStorage.setItem('hk_locked_months', JSON.stringify(lockedMonths));
-  }, [lockedMonths]);
 
   // AUTO-SYNC: Sync Damage Records with Store Inventory (Module 03 -> Module 01)
   useEffect(() => {
@@ -362,75 +397,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setVPPItems(prev => prev.filter(i => i.id !== id));
   };
 
-  // Module 06 Lock Month & Rollover Logic
-  const toggleLockMonth = (month: string) => {
-    setLockedMonths(prev => {
-      const existing = prev[month];
-      if (existing && existing.isLocked) {
-        // Unlock
-        return {
-          ...prev,
-          [month]: { ...existing, isLocked: false }
-        };
-      } else {
-        // Lock month and auto-rollover Ending Stock into Opening Stock for Next Month
-        const isNowLocked = true;
-
-        // Rollover Store items
-        setStoreItems(prevStore => prevStore.map(item => {
-          const ending = item.currentWarehouseStock + item.setupQty;
-          return {
-            ...item,
-            openingStock: ending,
-            incomingQty: 0,
-            transferQty: 0,
-            lossAndDamageQty: 0
-          };
-        }));
-
-        // Rollover Minibar items
-        setMinibarItems(prevMB => prevMB.map(item => {
-          const setupStock = roomSetups.reduce((acc, room) => acc + (room.itemQuantities[item.code] || 0), 0);
-          const actualStock = item.warehouseStock + setupStock;
-          return {
-            ...item,
-            openingStock: actualStock,
-            incomingQty: 0,
-            billedQty: 0,
-            noChangeQty: 0,
-            focQty: 0,
-            transferFOQty: 0,
-            transferFBQty: 0
-          };
-        }));
-
-        // Rollover VPP
-        setVPPItems(prevVPP => prevVPP.map(item => ({
-          ...item,
-          openingStock: item.endingStock,
-          incomingQty: 0
-        })));
-
-        return {
-          ...prev,
-          [month]: {
-            month,
-            isLocked: isNowLocked,
-            lockedAt: new Date().toISOString().replace('T', ' ').substring(0, 16),
-            lockedBy: userProfile.name + ' (' + userProfile.title + ')',
-            totalMinibarRevenue: minibarItems.reduce((acc, i) => acc + (i.billedQty * i.sellingPrice), 0),
-            totalDamageCost: damageRecords.reduce((acc, i) => acc + (!i.isCharge ? i.costAmount : 0), 0),
-            totalPRPOValue: prItems.reduce((acc, i) => acc + (i.adjustedPRQty * i.unitCost), 0),
-            totalInventoryValuation: storeItems.reduce((acc, i) => acc + ((i.currentWarehouseStock + i.setupQty) * i.unitCost), 0),
-            discrepancyCount: 0
-          }
-        };
-      }
-    });
-  };
-
-  const isMonthLocked = Boolean(lockedMonths[selectedMonth]?.isLocked);
-
   const resetToDefaults = () => {
     localStorage.clear();
     setStoreItems(INITIAL_STORE_ITEMS);
@@ -439,19 +405,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setDamageRecords(INITIAL_DAMAGE_RECORDS);
     setVPPItems(INITIAL_VPP_ITEMS);
     setDailyBills(INITIAL_DAILY_BILLS);
-    setLockedMonths({
-      '2026-06': {
-        month: '2026-06',
-        isLocked: true,
-        lockedAt: '2026-07-01 08:30',
-        lockedBy: 'Trần Thị Mỹ Hoa (HK Manager)',
-        totalMinibarRevenue: 42500000,
-        totalDamageCost: 3100000,
-        totalPRPOValue: 98000000,
-        totalInventoryValuation: 312000000,
-        discrepancyCount: 0
-      }
-    });
+    setLockedMonths({});
   };
 
   return (
@@ -466,6 +420,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       dailyBills, addDailyBill,
       vppItems, addVPPItem, updateVPPItem, deleteVPPItem,
       lockedMonths, toggleLockMonth, isMonthLocked,
+      isManagerMode, unlockManager, lockManagerSession, canEdit,
       resetToDefaults
     }}>
       {children}
