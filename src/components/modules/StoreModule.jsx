@@ -514,7 +514,7 @@ export default function StoreModule() {
       {/* ---- Table ---- */}
       <div className="max-h-[calc(100vh-160px)] overflow-y-auto overflow-x-auto rounded border border-[#141414] bg-white">
         <table className="w-full border-collapse text-xs">
-          <thead className="bg-slate-700 font-mono uppercase text-[10px] text-white">
+          <thead className="bg-slate-700 text-xs font-bold uppercase tracking-wide text-white">
             <tr>
               {[
                 'STT', 'Tên mặt hàng', 'ĐVT', 'Đầu kỳ', 'Set up', 'Nhập', 'Transfer',
