@@ -153,7 +153,7 @@ function ExportModal({ defaultFrom, defaultTo, onCancel, onConfirm }) {
 
 // ---------- Main component ----------
 export default function StoreModule() {
-  const { selectedMonth, setSelectedMonth } = useStore();
+  const { selectedMonth, setSelectedMonth, canEdit } = useStore();
   const thang = selectedMonth;
   const setThang = setSelectedMonth;
   const [items, setItems] = useState([]);
@@ -451,12 +451,19 @@ export default function StoreModule() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <button
-            onClick={() => setShowAddRow(true)}
-            className="flex items-center gap-1 rounded border border-[#141414] bg-white px-3 py-1.5 text-xs font-bold hover:bg-[#E4E3E0]"
-          >
-            <Plus className="h-3.5 w-3.5" /> Thêm mặt hàng
-          </button>
+          {!canEdit && (
+            <span className="flex items-center gap-1 rounded border border-slate-400 bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-600">
+              🔒 Chế độ Chỉ Xem — không thể chỉnh sửa
+            </span>
+          )}
+          {canEdit && (
+            <button
+              onClick={() => setShowAddRow(true)}
+              className="flex items-center gap-1 rounded border border-[#141414] bg-white px-3 py-1.5 text-xs font-bold hover:bg-[#E4E3E0]"
+            >
+              <Plus className="h-3.5 w-3.5" /> Thêm mặt hàng
+            </button>
+          )}
           <button
             onClick={() => setShowExportModal(true)}
             className="flex items-center gap-1 rounded bg-[#141414] px-3 py-1.5 text-xs font-bold text-white hover:bg-slate-800"
@@ -469,12 +476,14 @@ export default function StoreModule() {
           >
             <Printer className="h-3.5 w-3.5" /> In báo cáo
           </button>
-          <button
-            onClick={() => setConfirmRollover(true)}
-            className="flex items-center gap-1 rounded bg-[#10B981] px-3 py-1.5 text-xs font-bold text-white hover:bg-emerald-700"
-          >
-            <RefreshCw className="h-3.5 w-3.5" /> Kết chuyển sang tháng sau
-          </button>
+          {canEdit && (
+            <button
+              onClick={() => setConfirmRollover(true)}
+              className="flex items-center gap-1 rounded bg-[#10B981] px-3 py-1.5 text-xs font-bold text-white hover:bg-emerald-700"
+            >
+              <RefreshCw className="h-3.5 w-3.5" /> Kết chuyển sang tháng sau
+            </button>
+          )}
         </div>
       </div>
 
@@ -544,7 +553,8 @@ export default function StoreModule() {
                       onFocus={() => setFocusedRow(it.rowIndex)}
                       onKeyDown={(e) => handleGridKeyDown(e, 'Nhap')}
                       onBlur={() => { handleFieldBlur(it.rowIndex); setFocusedRow(null); }}
-                      className="w-16 bg-transparent px-2 py-1 text-right focus:bg-yellow-300 focus:outline-none focus:ring-2 focus:ring-yellow-500"
+                      disabled={!canEdit}
+                      className="w-16 bg-transparent px-2 py-1 text-right focus:bg-yellow-300 focus:outline-none focus:ring-2 focus:ring-yellow-500 disabled:cursor-not-allowed disabled:opacity-60"
                     />
                   </td>
                   <td className="border border-[#141414]/30 p-0">
@@ -556,7 +566,8 @@ export default function StoreModule() {
                       onFocus={() => setFocusedRow(it.rowIndex)}
                       onKeyDown={(e) => handleGridKeyDown(e, 'Transfer')}
                       onBlur={() => { handleFieldBlur(it.rowIndex); setFocusedRow(null); }}
-                      className="w-16 bg-transparent px-2 py-1 text-right focus:bg-yellow-300 focus:outline-none focus:ring-2 focus:ring-yellow-500"
+                      disabled={!canEdit}
+                      className="w-16 bg-transparent px-2 py-1 text-right focus:bg-yellow-300 focus:outline-none focus:ring-2 focus:ring-yellow-500 disabled:cursor-not-allowed disabled:opacity-60"
                     />
                   </td>
                   <td
@@ -585,7 +596,8 @@ export default function StoreModule() {
                       onFocus={() => setFocusedRow(it.rowIndex)}
                       onKeyDown={(e) => handleGridKeyDown(e, 'Ton')}
                       onBlur={() => { handleFieldBlur(it.rowIndex); setFocusedRow(null); }}
-                      className="w-16 bg-transparent px-2 py-1 text-right font-semibold text-red-600 focus:bg-yellow-300 focus:outline-none focus:ring-2 focus:ring-yellow-500"
+                      disabled={!canEdit}
+                      className="w-16 bg-transparent px-2 py-1 text-right font-semibold text-red-600 focus:bg-yellow-300 focus:outline-none focus:ring-2 focus:ring-yellow-500 disabled:cursor-not-allowed disabled:opacity-60"
                     />
                   </td>
 
@@ -599,14 +611,17 @@ export default function StoreModule() {
                       onFocus={() => setFocusedRow(it.rowIndex)}
                       onKeyDown={(e) => handleGridKeyDown(e, 'GhiChu')}
                       onBlur={() => { handleFieldBlur(it.rowIndex); setFocusedRow(null); }}
-                      className="w-32 bg-transparent px-2 py-1 focus:bg-yellow-300 focus:outline-none focus:ring-2 focus:ring-yellow-500"
+                      disabled={!canEdit}
+                      className="w-32 bg-transparent px-2 py-1 focus:bg-yellow-300 focus:outline-none focus:ring-2 focus:ring-yellow-500 disabled:cursor-not-allowed disabled:opacity-60"
                     />
                   </td>
 
                   <td className="border border-[#141414]/30 px-1 py-1 text-center print:hidden">
-                    <button onClick={() => handleDelete(it.rowIndex)} className="text-red-500 hover:text-red-700">
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
+                    {canEdit && (
+                      <button onClick={() => handleDelete(it.rowIndex)} className="text-red-500 hover:text-red-700">
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))
