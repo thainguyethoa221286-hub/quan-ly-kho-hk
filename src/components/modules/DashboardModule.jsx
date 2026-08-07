@@ -19,6 +19,8 @@ const REPORTS = [
     key: 'STORE',
     title: 'Kho HK & Vật Tư',
     icon: Package,
+    pastel: 'bg-blue-50 border-blue-200',
+    iconBg: 'bg-blue-100 text-blue-700',
     fetch: getKhoData,
     columns: [
       { key: 'Stt', label: 'STT' },
@@ -35,6 +37,8 @@ const REPORTS = [
     key: 'PRPO',
     title: 'Đề Xuất Mua Hàng PR-PO',
     icon: ShoppingCart,
+    pastel: 'bg-violet-50 border-violet-200',
+    iconBg: 'bg-violet-100 text-violet-700',
     fetch: async (thang) => (await getPRPOData(thang)).filter((it) => !it.Hidden),
     columns: [
       { key: 'Stt', label: 'STT' },
@@ -49,6 +53,8 @@ const REPORTS = [
     key: 'DAMAGE',
     title: 'Báo Cáo Hư Hỏng / FOC',
     icon: AlertTriangle,
+    pastel: 'bg-red-50 border-red-200',
+    iconBg: 'bg-red-100 text-red-700',
     fetch: getDamageData,
     columns: [
       { key: 'Stt', label: 'STT' },
@@ -65,6 +71,8 @@ const REPORTS = [
     key: 'MINIBAR',
     title: 'Minibar',
     icon: Coffee,
+    pastel: 'bg-amber-50 border-amber-200',
+    iconBg: 'bg-amber-100 text-amber-700',
     fetch: getMinibarSummary,
     columns: [
       { key: 'Stt', label: 'STT' },
@@ -81,6 +89,8 @@ const REPORTS = [
     key: 'VPP',
     title: 'Văn Phòng Phẩm (VPP)',
     icon: FileText,
+    pastel: 'bg-emerald-50 border-emerald-200',
+    iconBg: 'bg-emerald-100 text-emerald-700',
     fetch: getVPPData,
     columns: [
       { key: 'Stt', label: 'STT' },
@@ -287,7 +297,7 @@ export default function DashboardModule() {
 
       {/* ---- 2 KPI Cards ---- */}
       <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2 print:hidden">
-        <div className="rounded border border-[#141414] bg-white p-4">
+        <div className="rounded-xl border border-slate-200 bg-red-50 p-4 shadow-md transition-shadow duration-200 hover:shadow-lg">
           <p className="text-xs font-mono uppercase text-slate-500">Chi Phí Hư Hỏng FOC</p>
           {kpiLoading ? (
             <Loader2 className="mt-2 h-5 w-5 animate-spin text-slate-400" />
@@ -296,7 +306,7 @@ export default function DashboardModule() {
           )}
           <p className="text-[11px] text-slate-400">Tổng Chi Phí Thiệt Hại FOC — Module 03</p>
         </div>
-        <div className="rounded border border-[#141414] bg-white p-4">
+        <div className="rounded-xl border border-slate-200 bg-amber-50 p-4 shadow-md transition-shadow duration-200 hover:shadow-lg">
           <p className="text-xs font-mono uppercase text-slate-500">Discrepancy Minibar</p>
           {kpiLoading ? (
             <Loader2 className="mt-2 h-5 w-5 animate-spin text-slate-400" />
@@ -317,9 +327,9 @@ export default function DashboardModule() {
         {REPORTS.map((report) => {
           const Icon = report.icon;
           return (
-            <div key={report.key} className="rounded border border-[#141414] bg-white p-4">
+            <div key={report.key} className={`rounded-xl border p-4 shadow-md transition-shadow duration-200 hover:shadow-lg ${report.pastel}`}>
               <div className="mb-3 flex items-center gap-2">
-                <div className="flex h-8 w-8 items-center justify-center rounded bg-[#E4E3E0] text-[#141414]"><Icon className="h-4 w-4" /></div>
+                <div className={`flex h-8 w-8 items-center justify-center rounded-lg ${report.iconBg}`}><Icon className="h-4 w-4" /></div>
                 <p className="text-sm font-bold text-[#141414]">{report.title}</p>
               </div>
               <div className="flex flex-wrap gap-1.5">
