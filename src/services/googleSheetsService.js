@@ -187,3 +187,11 @@ export function deleteVPPItem(thang, rowIndex) {
 export function rolloverVPPMonth(fromThang, toThang) {
   return jsonpRequest({ action: 'rolloverVPPMonth', fromThang, toThang }, 60000);
 }
+
+/** ===== Khoá Sổ Tháng (dùng chung toàn bộ 6 module) ===== */
+export function getMonthLockStatus(thang) {
+  return jsonpRequest({ action: 'getMonthLock', thang });
+}
+export function setMonthLockStatus(thang, locked) {
+  return jsonpRequest({ action: 'setMonthLock', thang, locked: String(locked) });
+}
