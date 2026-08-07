@@ -7,7 +7,7 @@ import PRPOModule from './components/modules/PRPOModule';
 import LossDamageModule from './components/modules/LossDamageModule';
 import MinibarModule from './components/modules/MinibarModule';
 import OfficeSuppliesModule from './components/modules/OfficeSuppliesModule';
-import { Module06Dashboard } from './components/modules/Module06Dashboard';
+import DashboardModule from './components/modules/DashboardModule';
 
 export default function App() {
   const [activeModule, setActiveModule] = useState<ActiveModule>('MODULE_01_STORE');
@@ -40,7 +40,7 @@ export default function App() {
               {activeModule === 'MODULE_03_DAMAGE' && <LossDamageModule />}
               {activeModule === 'MODULE_04_MINIBAR' && <MinibarModule />}
               {activeModule === 'MODULE_05_VPP' && <OfficeSuppliesModule />}
-              {activeModule === 'MODULE_06_DASHBOARD' && <Module06Dashboard />}
+              {activeModule === 'MODULE_06_DASHBOARD' && <DashboardModule />}
 
             </div>
           </main>
