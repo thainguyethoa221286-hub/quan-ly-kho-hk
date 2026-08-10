@@ -120,17 +120,17 @@ function DiscrepancyModal({ items, onClose }) {
           <p className="py-8 text-center text-sm text-slate-400">Không có chênh lệch nào 🎉</p>
         ) : (
           <table className="w-full border-collapse text-xs">
-            <thead className="bg-[#F2F1EE] font-mono uppercase text-[10px]">
+            <thead className="bg-slate-700 text-xs font-bold uppercase tracking-wide text-white">
               <tr>
-                <th className="border border-slate-300 px-2 py-1.5 text-left">Item</th>
-                <th className="border border-slate-300 px-2 py-1.5 text-right">Tồn Trên Báo Cáo</th>
-                <th className="border border-slate-300 px-2 py-1.5 text-right">Tồn Thực Tế</th>
-                <th className="border border-slate-300 px-2 py-1.5 text-right">Chênh Lệch</th>
+                <th className="border border-white/20 px-2 py-1.5 text-left">Item</th>
+                <th className="border border-white/20 px-2 py-1.5 text-right">Tồn Trên Báo Cáo</th>
+                <th className="border border-white/20 px-2 py-1.5 text-right">Tồn Thực Tế</th>
+                <th className="border border-white/20 px-2 py-1.5 text-right">Chênh Lệch</th>
               </tr>
             </thead>
             <tbody>
-              {mismatched.map((it) => (
-                <tr key={it.rowIndex}>
+              {mismatched.map((it, idx) => (
+                <tr key={it.rowIndex} className={`transition-colors hover:bg-amber-100 ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50'}`}>
                   <td className="border border-slate-300 px-2 py-1.5 font-medium">{it.TenHang}</td>
                   <td className="border border-slate-300 px-2 py-1.5 text-right">{fmtNumber(it.TonSachVo)}</td>
                   <td className="border border-slate-300 px-2 py-1.5 text-right">{fmtNumber(it.TonThucTe)}</td>
@@ -242,7 +242,7 @@ function PMSReconciliationModal({ rows, onClose }) {
             <p className="py-8 text-center text-sm text-slate-400">Không có chênh lệch nào phù hợp bộ lọc 🎉</p>
           ) : (
             <table className="w-full border-collapse text-xs">
-              <thead className="sticky top-0 bg-[#F2F1EE] font-mono uppercase text-[10px]">
+              <thead className="sticky top-0 bg-slate-700 text-xs font-bold uppercase tracking-wide text-white">
                 <tr>
                   <th className="border border-slate-300 px-2 py-1.5 text-left">Ngày</th>
                   <th className="border border-slate-300 px-2 py-1.5 text-left">Số Phòng</th>
@@ -255,7 +255,7 @@ function PMSReconciliationModal({ rows, onClose }) {
               </thead>
               <tbody>
                 {filtered.map((r, idx) => (
-                  <tr key={idx}>
+                  <tr key={idx} className={`transition-colors hover:bg-amber-100 ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50'}`}>
                     <td className="border border-slate-200 px-2 py-1.5 whitespace-nowrap">{fmtDateDisplay(r.ngay)}</td>
                     <td className="border border-slate-200 px-2 py-1.5 font-semibold">{r.phong}</td>
                     <td className="border border-slate-200 px-2 py-1.5">{r.tenItem}</td>
@@ -455,7 +455,7 @@ function SummaryTab({ thang, catalog, onReloadCatalog }) {
       )}
 
       <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 print:hidden">
-        <button onClick={() => setShowDiscrepancy(true)} className="flex items-center justify-between rounded border border-[#141414] bg-white p-4 text-left hover:bg-red-50/40">
+        <button onClick={() => setShowDiscrepancy(true)} className="flex items-center justify-between rounded-xl border border-slate-200 bg-red-50 p-4 text-left shadow-md transition-shadow duration-200 hover:shadow-lg">
           <div>
             <p className="text-xs font-mono uppercase text-slate-500">Chênh Lệch Kiểm Kê</p>
             {totals.urgentCount > 0 ? (
@@ -471,7 +471,7 @@ function SummaryTab({ thang, catalog, onReloadCatalog }) {
         </button>
 
         {pmsRecords && (
-          <button onClick={() => setShowPmsModal(true)} className="flex items-center justify-between rounded border border-[#141414] bg-white p-4 text-left hover:bg-red-50/40">
+          <button onClick={() => setShowPmsModal(true)} className="flex items-center justify-between rounded-xl border border-slate-200 bg-amber-50 p-4 text-left shadow-md transition-shadow duration-200 hover:shadow-lg">
             <div>
               <p className="text-xs font-mono uppercase text-slate-500">Đối Soát PMS</p>
               {pmsDiscrepancies.length > 0 ? (
@@ -487,7 +487,7 @@ function SummaryTab({ thang, catalog, onReloadCatalog }) {
           </button>
         )}
 
-        <div className="rounded border border-[#141414] bg-white p-4">
+        <div className="rounded-xl border border-slate-200 bg-blue-50 p-4 shadow-md transition-shadow duration-200 hover:shadow-lg">
           <p className="text-xs font-mono uppercase text-slate-500">Tồn Khay Setup Phòng</p>
           <p className="mt-1 text-2xl font-bold text-[#141414]">{fmtNumber(totals.setupTotal)} <span className="text-sm font-normal text-slate-400">mục</span></p>
           <p className="text-[11px] text-slate-400">Lấy tự động từ Sub 4B + FB Tồn Đầu</p>
@@ -496,10 +496,10 @@ function SummaryTab({ thang, catalog, onReloadCatalog }) {
 
       <div className="max-h-[calc(100vh-260px)] overflow-y-auto overflow-x-auto rounded border border-[#141414] bg-white">
         <table className="w-full border-collapse text-xs">
-          <thead className="bg-[#F2F1EE] font-mono uppercase text-[10px] text-[#141414]">
+          <thead className="bg-slate-700 text-xs font-bold uppercase tracking-wide text-white">
             <tr>
               {['STT', 'TÊN HÀNG MINIBAR', 'ĐVT', 'TỒN ĐẦU', 'NHẬP', 'BILLED', 'NO CHARGE', 'FOC', 'TRANS FO', 'TRANS FB', 'TỒN KHO MB', 'SETUP ROOM', 'TỒN TRÊN BÁO CÁO', 'TỒN THỰC TẾ', 'CHÊNH LỆCH', 'GHI CHÚ'].map((h, i) => (
-                <th key={h + i} className={`sticky top-0 z-20 border border-[#141414]/30 bg-[#F2F1EE] px-2 py-2 text-left shadow-[0_1px_0_0_#141414] ${i === 1 ? 'min-w-[200px]' : ''}`}>{h}</th>
+                <th key={h + i} className={`sticky top-0 z-20 border border-white/20 bg-slate-700 px-2 py-2 text-left shadow-[0_1px_0_0_#141414] ${i === 1 ? 'min-w-[200px]' : ''}`}>{h}</th>
               ))}
             </tr>
           </thead>
@@ -509,10 +509,13 @@ function SummaryTab({ thang, catalog, onReloadCatalog }) {
             ) : items.length === 0 ? (
               <tr><td colSpan={16} className="py-8 text-center text-slate-400">Chưa có Item nào. Bấm "+ Thêm Item Minibar" để bắt đầu.</td></tr>
             ) : (
-              items.map((it) => {
+              items.map((it, idx) => {
                 const mismatched = Number(it.ChenhLech) !== 0;
                 return (
-                  <tr key={it.rowIndex} className={savingRows[it.rowIndex] ? 'opacity-50' : mismatched ? 'bg-red-50/40' : ''}>
+                  <tr
+                    key={it.rowIndex}
+                    className={`transition-colors hover:bg-amber-100 ${savingRows[it.rowIndex] ? 'opacity-50' : mismatched ? 'bg-red-50/60' : idx % 2 === 0 ? 'bg-white' : 'bg-slate-50'}`}
+                  >
                     <td className="border border-[#141414]/30 px-2 py-1">{it.Stt}</td>
                     <td className="min-w-[200px] border border-[#141414]/30 px-2 py-1 font-medium">{it.TenHang}</td>
                     <td className="border border-[#141414]/30 px-2 py-1">{it.DVT}</td>
@@ -699,7 +702,7 @@ function DailyBillsTab({ thang, catalog }) {
       )}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         {/* ---- Left: Form ---- */}
-        <div className="rounded border border-[#141414] bg-white p-4">
+        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-md">
           <h3 className="mb-3 flex items-center gap-2 text-sm font-bold uppercase text-[#141414]">
             <Receipt className="h-4 w-4" /> Ghi Nhận Tiêu Dùng Hằng Ngày Theo Phòng
             {editingBillId && <span className="rounded bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-700">Đang sửa Bill {editingBillId}</span>}
@@ -756,7 +759,7 @@ function DailyBillsTab({ thang, catalog }) {
         </div>
 
         {/* ---- Right: History ---- */}
-        <div className="rounded border border-[#141414] bg-white p-4">
+        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-md">
           <h3 className="mb-3 text-sm font-bold uppercase text-[#141414]">Lịch Sử Daily Bills</h3>
           <div className="mb-3 flex items-center gap-2 text-xs">
             <span className="text-slate-500">Từ ngày</span>
@@ -898,22 +901,22 @@ function SetupTab({ thang }) {
       )}
 
       {/* ---- Matrix Item x Floor ---- */}
-      <div className="rounded border border-[#141414] bg-white p-4">
+      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-md">
         <h3 className="mb-3 flex items-center gap-2 text-sm font-bold uppercase text-[#141414]">
           <Layers className="h-4 w-4" /> Ma Trận Setup Theo Tầng
         </h3>
         <div className="max-h-[420px] overflow-auto rounded border border-slate-200">
           <table className="w-full border-collapse text-xs">
-            <thead className="bg-[#F2F1EE] font-mono text-[10px] uppercase">
+            <thead className="bg-slate-700 text-xs font-bold uppercase tracking-wide text-white">
               <tr>
-                <th className="sticky left-0 top-0 z-30 min-w-[180px] border border-slate-300 bg-[#F2F1EE] px-2 py-2 text-left">Item</th>
-                {FLOORS.map((f) => <th key={f} className="sticky top-0 z-20 border border-slate-300 bg-[#F2F1EE] px-2 py-2 text-center">{f}</th>)}
-                <th className="sticky top-0 z-20 border border-slate-300 bg-[#F2F1EE] px-2 py-2 text-center">Total</th>
+                <th className="sticky left-0 top-0 z-30 min-w-[180px] border border-white/20 bg-slate-700 px-2 py-2 text-left">Item</th>
+                {FLOORS.map((f) => <th key={f} className="sticky top-0 z-20 border border-white/20 bg-slate-700 px-2 py-2 text-center">{f}</th>)}
+                <th className="sticky top-0 z-20 border border-white/20 bg-slate-700 px-2 py-2 text-center">Total</th>
               </tr>
             </thead>
             <tbody>
-              {matrix.map((r) => (
-                <tr key={r.rowIndex} className={savingKey === `m-${r.rowIndex}` ? 'opacity-50' : ''}>
+              {matrix.map((r, idx) => (
+                <tr key={r.rowIndex} className={`transition-colors hover:bg-amber-100 ${savingKey === `m-${r.rowIndex}` ? 'opacity-50' : idx % 2 === 0 ? 'bg-white' : 'bg-slate-50'}`}>
                   <td className="sticky left-0 z-10 min-w-[180px] border border-slate-200 bg-white px-2 py-1 font-medium">{r.TenHang}</td>
                   {FLOORS.map((f) => (
                     <td key={f} className="border border-slate-200 p-0">
@@ -933,28 +936,28 @@ function SetupTab({ thang }) {
       </div>
 
       {/* ---- FB / FO Table ---- */}
-      <div className="rounded border border-[#141414] bg-white p-4">
+      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-md">
         <h3 className="mb-1 flex items-center gap-2 text-sm font-bold uppercase text-[#141414]">
           <Coffee className="h-4 w-4" /> Bảng F&amp;B / FO
         </h3>
         <p className="mb-3 text-[11px] text-slate-400">Nhân viên tự cập nhật Tồn Đầu/Tồn Cuối mỗi tháng. Transfer tự tính = Tồn Đầu − Tồn Cuối.</p>
         <div className="max-h-[380px] overflow-auto rounded border border-slate-200">
           <table className="w-full border-collapse text-xs">
-            <thead className="bg-[#F2F1EE] font-mono text-[10px] uppercase">
+            <thead className="bg-slate-700 text-xs font-bold uppercase tracking-wide text-white">
               <tr>
-                <th className="sticky top-0 z-20 min-w-[180px] border border-slate-300 bg-[#F2F1EE] px-2 py-2 text-left">Item</th>
-                <th className="sticky top-0 z-20 border border-slate-300 bg-[#F2F1EE] px-2 py-2 text-center">FB Tồn Đầu</th>
-                <th className="sticky top-0 z-20 border border-slate-300 bg-[#F2F1EE] px-2 py-2 text-center">FB Tồn Cuối</th>
-                <th className="sticky top-0 z-20 border border-slate-300 bg-[#F2F1EE] px-2 py-2 text-center">FB Transfer</th>
-                <th className="sticky top-0 z-20 border border-slate-300 bg-[#F2F1EE] px-2 py-2 text-center">FO Tồn Đầu</th>
-                <th className="sticky top-0 z-20 border border-slate-300 bg-[#F2F1EE] px-2 py-2 text-center">FO Tồn Cuối</th>
-                <th className="sticky top-0 z-20 border border-slate-300 bg-[#F2F1EE] px-2 py-2 text-center">FO Transfer</th>
-                <th className="sticky top-0 z-20 border border-slate-300 bg-[#F2F1EE] px-2 py-2 text-left">Ghi Chú</th>
+                <th className="sticky top-0 z-20 min-w-[180px] border border-white/20 bg-slate-700 px-2 py-2 text-left">Item</th>
+                <th className="sticky top-0 z-20 border border-white/20 bg-slate-700 px-2 py-2 text-center">FB Tồn Đầu</th>
+                <th className="sticky top-0 z-20 border border-white/20 bg-slate-700 px-2 py-2 text-center">FB Tồn Cuối</th>
+                <th className="sticky top-0 z-20 border border-white/20 bg-slate-700 px-2 py-2 text-center">FB Transfer</th>
+                <th className="sticky top-0 z-20 border border-white/20 bg-slate-700 px-2 py-2 text-center">FO Tồn Đầu</th>
+                <th className="sticky top-0 z-20 border border-white/20 bg-slate-700 px-2 py-2 text-center">FO Tồn Cuối</th>
+                <th className="sticky top-0 z-20 border border-white/20 bg-slate-700 px-2 py-2 text-center">FO Transfer</th>
+                <th className="sticky top-0 z-20 border border-white/20 bg-slate-700 px-2 py-2 text-left">Ghi Chú</th>
               </tr>
             </thead>
             <tbody>
-              {fbfo.map((r) => (
-                <tr key={r.rowIndex} className={savingKey === `f-${r.rowIndex}` ? 'opacity-50' : ''}>
+              {fbfo.map((r, idx) => (
+                <tr key={r.rowIndex} className={`transition-colors hover:bg-amber-100 ${savingKey === `f-${r.rowIndex}` ? 'opacity-50' : idx % 2 === 0 ? 'bg-white' : 'bg-slate-50'}`}>
                   <td className="min-w-[180px] border border-slate-200 px-2 py-1 font-medium">{r.TenHang}</td>
                   {['FBTonDau', 'FBTonCuoi'].map((f) => (
                     <td key={f} className="border border-slate-200 p-0">
