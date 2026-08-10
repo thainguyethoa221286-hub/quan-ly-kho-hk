@@ -233,10 +233,10 @@ export default function OfficeSuppliesModule() {
 
       <div className="max-h-[calc(100vh-160px)] overflow-y-auto overflow-x-auto rounded border border-[#141414] bg-white">
         <table className="w-full border-collapse text-xs">
-          <thead className="bg-[#F2F1EE] font-mono uppercase text-[10px] text-[#141414]">
+          <thead className="bg-slate-700 text-xs font-bold uppercase tracking-wide text-white">
             <tr>
               {['STT', 'TÊN VĂN PHÒNG PHẨM', 'ĐVT', 'TỒN ĐẦU', 'NHẬP', 'TỒN CUỐI KỲ', 'XUẤT SỬ DỤNG', 'GHI CHÚ', ''].map((h, i) => (
-                <th key={h + i} className={`sticky top-0 z-20 border border-[#141414]/30 bg-[#F2F1EE] px-2 py-2 text-left shadow-[0_1px_0_0_#141414] ${i === 1 ? 'min-w-[240px]' : ''}`}>{h}</th>
+                <th key={h + i} className={`sticky top-0 z-20 border border-white/20 bg-slate-700 px-2 py-2 text-left shadow-[0_1px_0_0_#141414] ${i === 1 ? 'min-w-[240px]' : ''}`}>{h}</th>
               ))}
             </tr>
           </thead>
@@ -246,8 +246,11 @@ export default function OfficeSuppliesModule() {
             ) : items.length === 0 ? (
               <tr><td colSpan={9} className="py-8 text-center text-slate-400">Chưa có mặt hàng nào. Bấm "+ Thêm Mặt Hàng" để bắt đầu.</td></tr>
             ) : (
-              items.map((it) => (
-                <tr key={it.rowIndex} className={savingRows[it.rowIndex] ? 'opacity-50' : ''}>
+              items.map((it, idx) => (
+                <tr
+                  key={it.rowIndex}
+                  className={`transition-colors hover:bg-amber-100 ${savingRows[it.rowIndex] ? 'opacity-50' : idx % 2 === 0 ? 'bg-white' : 'bg-slate-50'}`}
+                >
                   <td className="border border-[#141414]/30 px-2 py-1">{it.Stt}</td>
                   <td className="min-w-[240px] border border-[#141414]/30 px-2 py-1 font-medium">{it.TenHang}</td>
                   <td className="border border-[#141414]/30 px-2 py-1">{it.DVT}</td>
