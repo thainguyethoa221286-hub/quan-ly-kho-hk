@@ -545,7 +545,7 @@ export default function StoreModule() {
               filteredItems.map((it, idx) => (
                 <tr
                   key={it.rowIndex}
-                  className={`transition-colors hover:bg-amber-50 ${savingRows[it.rowIndex] ? 'opacity-50' : idx % 2 === 0 ? 'bg-white' : 'bg-slate-50'}`}
+                  className={`transition-colors hover:bg-amber-100 ${savingRows[it.rowIndex] ? 'opacity-50' : idx % 2 === 0 ? 'bg-white' : 'bg-slate-50'}`}
                 >
                   <td className="border border-[#141414]/30 px-2 py-1">{it.Stt}</td>
                   <td
