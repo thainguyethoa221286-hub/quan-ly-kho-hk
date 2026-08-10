@@ -439,12 +439,12 @@ export default function LossDamageModule() {
 
       {/* ---- Stat cards ---- */}
       <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2 print:hidden">
-        <div className="rounded border border-[#141414] bg-white p-4">
+        <div className="rounded-xl border border-slate-200 bg-teal-50 p-4 shadow-md transition-shadow duration-200 hover:shadow-lg">
           <p className="text-xs font-mono uppercase text-slate-500">Khách Đền Bù (Charge)</p>
           <p className="mt-1 text-2xl font-bold text-teal-600">{fmtNumber(totals.sumCharge)} đ</p>
           <p className="text-[11px] text-slate-400">Lễ Tân thu tiền qua Folio phòng</p>
         </div>
-        <div className="rounded border border-[#141414] bg-white p-4">
+        <div className="rounded-xl border border-slate-200 bg-red-50 p-4 shadow-md transition-shadow duration-200 hover:shadow-lg">
           <p className="text-xs font-mono uppercase text-slate-500">Chi Phí Thiệt Hại FOC</p>
           <p className="mt-1 text-2xl font-bold text-red-600">{fmtNumber(totals.sumFOC)} đ</p>
           <p className="text-[11px] text-slate-400">Cần có chữ ký phê duyệt FOC</p>
@@ -454,10 +454,10 @@ export default function LossDamageModule() {
       {/* ---- Table ---- */}
       <div className="max-h-[calc(100vh-340px)] overflow-y-auto overflow-x-auto rounded border border-[#141414] bg-white">
         <table className="w-full border-collapse text-xs">
-          <thead className="bg-[#F2F1EE] font-mono uppercase text-[10px] text-[#141414]">
+          <thead className="bg-slate-700 text-xs font-bold uppercase tracking-wide text-white">
             <tr>
               {['STT', 'NGÀY', 'ITEM', 'VỊ TRÍ/PHÒNG', 'SL', 'HÌNH THỨC CHI PHÍ', 'THU KHÁCH (CHARGE)', 'CHI PHÍ THIỆT HẠI FOC', 'PHÊ DUYỆT BỞI', 'GHI CHÚ', 'THAO TÁC'].map((h, i) => (
-                <th key={h + i} className={`sticky top-0 z-20 border border-[#141414]/30 bg-[#F2F1EE] px-2 py-2 text-left shadow-[0_1px_0_0_#141414] ${i === 2 ? 'min-w-[220px]' : ''}`}>
+                <th key={h + i} className={`sticky top-0 z-20 border border-white/20 bg-slate-700 px-2 py-2 text-left shadow-[0_1px_0_0_#141414] ${i === 2 ? 'min-w-[220px]' : ''}`}>
                   {h}
                 </th>
               ))}
@@ -469,8 +469,11 @@ export default function LossDamageModule() {
             ) : items.length === 0 ? (
               <tr><td colSpan={11} className="py-8 text-center text-slate-400">Chưa có báo cáo hư hỏng nào trong tháng này.</td></tr>
             ) : (
-              items.map((it) => (
-                <tr key={it.rowIndex} className={savingRows[it.rowIndex] ? 'opacity-50' : ''}>
+              items.map((it, idx) => (
+                <tr
+                  key={it.rowIndex}
+                  className={`transition-colors hover:bg-amber-100 ${savingRows[it.rowIndex] ? 'opacity-50' : idx % 2 === 0 ? 'bg-white' : 'bg-slate-50'}`}
+                >
                   <td className="border border-[#141414]/30 px-2 py-1">{it.Stt}</td>
                   <td className="border border-[#141414]/30 px-2 py-1 whitespace-nowrap">{fmtDateDisplay(it.Ngay)}</td>
                   <td className="min-w-[220px] border border-[#141414]/30 px-2 py-1 font-medium">{it.TenHang}</td>
