@@ -473,7 +473,7 @@ export default function PRPOModule() {
 
       {/* ---- Stat cards ---- */}
       <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2 print:hidden">
-        <div className="rounded border border-[#141414] bg-white p-4">
+        <div className="rounded-xl border border-slate-200 bg-violet-50 p-4 shadow-md transition-shadow duration-200 hover:shadow-lg">
           <p className="text-xs font-mono uppercase text-slate-500">Tổng SL Đề Xuất Mua</p>
           <p className="mt-1 text-2xl font-bold text-[#141414]">{fmtNumber(totals.sumDeXuat)} <span className="text-sm font-normal text-slate-400">sản phẩm</span></p>
         </div>
@@ -482,7 +482,7 @@ export default function PRPOModule() {
         <div ref={urgentRef} className="relative">
           <button
             onClick={() => setShowUrgentList((s) => !s)}
-            className="flex w-full items-center justify-between rounded border border-[#141414] bg-white p-4 text-left hover:bg-red-50/40"
+            className="flex w-full items-center justify-between rounded-xl border border-slate-200 bg-red-50 p-4 text-left shadow-md transition-shadow duration-200 hover:shadow-lg"
           >
             <div>
               <p className="flex items-center gap-1 text-xs font-mono uppercase text-slate-500">
@@ -496,7 +496,7 @@ export default function PRPOModule() {
           </button>
 
           {showUrgentList && (
-            <div className="absolute left-0 right-0 top-full z-30 mt-1 max-h-64 overflow-y-auto rounded border border-red-300 bg-white shadow-xl">
+            <div className="absolute left-0 right-0 top-full z-30 mt-1 max-h-64 overflow-y-auto rounded-xl border border-red-300 bg-white shadow-xl">
               {totals.urgentItems.length === 0 ? (
                 <p className="p-3 text-center text-sm text-slate-400">Không có mặt hàng nào hết tồn kho 🎉</p>
               ) : (
@@ -521,10 +521,10 @@ export default function PRPOModule() {
       {/* ---- Table ---- */}
       <div className="max-h-[calc(100vh-320px)] overflow-y-auto overflow-x-auto rounded border border-[#141414] bg-white">
         <table className="w-full border-collapse text-xs">
-          <thead className="bg-[#F2F1EE] font-mono uppercase text-[10px] text-[#141414]">
+          <thead className="bg-slate-700 text-xs font-bold uppercase tracking-wide text-white">
             <tr>
               {['STT', 'ITEM', 'UNIT', 'STOCK IN HAND', 'STOCK MAX', 'ĐỀ XUẤT MUA', 'NOTED', ''].map((h, i) => (
-                <th key={h + i} className={`sticky top-0 z-20 border border-[#141414]/30 bg-[#F2F1EE] px-2 py-2 text-left shadow-[0_1px_0_0_#141414] ${i === 1 ? 'min-w-[260px]' : ''}`}>
+                <th key={h + i} className={`sticky top-0 z-20 border border-white/20 bg-slate-700 px-2 py-2 text-left shadow-[0_1px_0_0_#141414] ${i === 1 ? 'min-w-[260px]' : ''}`}>
                   {h}
                 </th>
               ))}
@@ -544,10 +544,13 @@ export default function PRPOModule() {
                 </td>
               </tr>
             ) : (
-              visibleItems.map((it) => {
+              visibleItems.map((it, idx) => {
                 const isUrgent = (Number(it.StockInHand) || 0) <= 0;
                 return (
-                  <tr key={it.rowIndex} className={savingRows[it.rowIndex] ? 'opacity-50' : isUrgent ? 'bg-red-50/50' : ''}>
+                  <tr
+                    key={it.rowIndex}
+                    className={`transition-colors hover:bg-amber-100 ${savingRows[it.rowIndex] ? 'opacity-50' : isUrgent ? 'bg-red-50/60' : idx % 2 === 0 ? 'bg-white' : 'bg-slate-50'}`}
+                  >
                     <td className="border border-[#141414]/30 px-2 py-1">{it.Stt}</td>
                     <td className="min-w-[260px] border border-[#141414]/30 px-2 py-1 font-medium">{it.TenHang}</td>
                     <td className="border border-[#141414]/30 px-2 py-1">{it.DVT}</td>
