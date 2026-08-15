@@ -9,7 +9,7 @@ import {
   deleteDamageItem,
 } from '../../services/googleSheetsService';
 
-const GROUPS = ['Amenities', 'CCDC', 'Linen', 'Minibar', 'Hút thuốc', 'Khác'];
+const GROUPS = ['Amenities', 'CCDC', 'Linen', 'Minibar', 'Setup', 'Hút thuốc', 'Khác'];
 const fmtNumber = (v) => (Number(v) || 0).toLocaleString('vi-VN');
 
 // Lấy ngày hôm nay theo GIỜ ĐỊA PHƯƠNG (không dùng toISOString() vì nó quy
@@ -99,18 +99,27 @@ function AddDamageModal({ catalog, onCancel, onConfirm }) {
           </div>
           <div>
             <label className="mb-1 block text-xs font-semibold text-slate-600">Chọn Item</label>
-            <select
-              value={form.TenHang}
-              onChange={set('TenHang')}
-              disabled={!form.Nhom}
-              className="w-full rounded border border-slate-300 px-2 py-2 text-sm focus:outline-none disabled:bg-slate-100"
-            >
-              <option value="">{form.Nhom ? '-- Chọn item --' : 'Chọn nhóm trước'}</option>
-              {itemsInGroup.map((it) => (
-                <option key={it.TenHang} value={it.TenHang}>{it.TenHang}</option>
-              ))}
-            </select>
-            {form.Nhom && itemsInGroup.length === 0 && (
+            {form.Nhom === 'Khác' ? (
+              <input
+                value={form.TenHang}
+                onChange={set('TenHang')}
+                placeholder="Gõ tên mặt hàng..."
+                className="w-full rounded border border-slate-300 px-2 py-2 text-sm focus:outline-none"
+              />
+            ) : (
+              <select
+                value={form.TenHang}
+                onChange={set('TenHang')}
+                disabled={!form.Nhom}
+                className="w-full rounded border border-slate-300 px-2 py-2 text-sm focus:outline-none disabled:bg-slate-100"
+              >
+                <option value="">{form.Nhom ? '-- Chọn item --' : 'Chọn nhóm trước'}</option>
+                {itemsInGroup.map((it) => (
+                  <option key={it.TenHang} value={it.TenHang}>{it.TenHang}</option>
+                ))}
+              </select>
+            )}
+            {form.Nhom && form.Nhom !== 'Khác' && itemsInGroup.length === 0 && (
               <p className="mt-1 text-[11px] text-amber-600">Nhóm này chưa có Item nào — vào Google Sheet tab "DAMAGE_ITEMS_CATALOG" để gán nhóm cho Item.</p>
             )}
           </div>
