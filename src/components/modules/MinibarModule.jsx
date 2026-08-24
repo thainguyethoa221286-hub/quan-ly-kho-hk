@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 import * as XLSX from 'xlsx-js-style';
 import { useStore } from '../../context/StoreContext';
-import { parsePMSPdfFile } from '../../services/pmsPdfParser';
+import { parsePMSPdfFile, normalizeMinibarItemName } from '../../services/pmsPdfParser';
 import {
   getMinibarCatalog, saveMinibarCatalogItem,
   getMinibarSetup, saveMinibarSetupItem,
@@ -156,12 +156,12 @@ function DiscrepancyModal({ items, onClose }) {
 function compareAppVsPMS(appBillRows, pmsRecords) {
   const appMap = {};
   appBillRows.forEach((r) => {
-    const key = `${r.Ngay}|${r.Phong}|${r.TenHang}`;
+    const key = `${r.Ngay}|${r.Phong}|${normalizeMinibarItemName(r.TenHang)}`;
     appMap[key] = (appMap[key] || 0) + (Number(r.SLBill) || 0);
   });
   const pmsMap = {};
   pmsRecords.forEach((r) => {
-    const key = `${r.ngay}|${r.phong}|${r.tenItem}`;
+    const key = `${r.ngay}|${r.phong}|${normalizeMinibarItemName(r.tenItem)}`;
     pmsMap[key] = (pmsMap[key] || 0) + r.soLuong;
   });
   const allKeys = new Set([...Object.keys(appMap), ...Object.keys(pmsMap)]);
