@@ -24,6 +24,29 @@ const PRODUCT_CODE_MAP = {
   BQ269: '7Up 320ml',
 };
 
+/**
+ * Chuẩn hoá tên Item Minibar về ĐÚNG 1 DẠNG CHUẨN DUY NHẤT, bất kể tên gốc
+ * là tên ngắn ("Pepsi") hay tên dài đọc từ PDF ("Nước ngọt Pepsi 320ml").
+ * Dùng hàm này cho CẢ 2 PHÍA khi đối soát (tên trên App lẫn tên đọc từ PMS)
+ * để không bị tách thành 2 dòng khác nhau do đặt tên khác nhau.
+ *
+ * ⚠️ Nếu sau này có thêm sản phẩm Minibar mới, bổ sung thêm 1 dòng if ở đây.
+ */
+export function normalizeMinibarItemName(rawName) {
+  if (!rawName) return '';
+  const name = rawName.toLowerCase();
+
+  if (name.includes('pepsi')) return 'Pepsi 320ml';
+  if (name.includes('7up') || name.includes('7 up')) return '7Up 320ml';
+  if (name.includes('evian') && (name.includes('33') || name.includes('330'))) return 'Evian 330ml';
+  if (name.includes('evian') && (name.includes('50') || name.includes('500'))) return 'Evian 500ml';
+  if (name.includes('evian')) return 'Evian 330ml'; // Evian không ghi rõ dung tích -> mặc định loại phổ biến nhất
+  if (name.includes('saigon')) return 'Saigon Special 330ml';
+  if (name.includes('tiger')) return 'Tiger 330ml';
+
+  return rawName.trim();
+}
+
 const HEADER_RE = /Số hóa đơn:\s*(\S+)\s*Ngày hóa đơn:\s*(\d{2}\/\d{2}\/\d{4})\s*Mã đặt phòng:\s*(\S+)\s*Số phòng:\s*(\S+)\s*Phòng gốc:\s*(\S+)\s*Nhân viên:\s*(.+)/;
 const PRODUCT_RE = /^(BQ\d+)\s+(.+?)\s+([\d,]+)\s+(\d+)\s+([\d,]+)\s+(\d+)$/;
 
@@ -59,7 +82,7 @@ function parseLines(lines) {
     if (p && current) {
       const code = p[1];
       const soLuong = Number(p[4]) || 0;
-      const tenItem = PRODUCT_CODE_MAP[code] || p[2].trim();
+      const tenItem = normalizeMinibarItemName(PRODUCT_CODE_MAP[code] || p[2]);
       records.push({ ngay: current.ngay, phong: current.phong, tenItem, soLuong, maSanPham: code });
     }
   });
