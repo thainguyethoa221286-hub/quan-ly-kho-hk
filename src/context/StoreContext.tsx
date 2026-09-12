@@ -18,6 +18,8 @@ const MANAGER_PASSWORD = 'MHOTEL2026';
 interface StoreContextType {
   selectedMonth: string; // e.g. "2026-07"
   setSelectedMonth: (month: string) => void;
+  hasConfirmedMonth: boolean;
+  confirmMonth: () => void;
   
   userProfile: UserProfile;
   setUserRole: (role: Role) => void;
@@ -66,7 +68,13 @@ interface StoreContextType {
 const StoreContext = createContext<StoreContextType | undefined>(undefined);
 
 export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [selectedMonth, setSelectedMonth] = useState<string>('2026-07');
+  const getCurrentMonthStr = () => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  };
+  const [selectedMonth, setSelectedMonth] = useState<string>(getCurrentMonthStr());
+  const [hasConfirmedMonth, setHasConfirmedMonth] = useState<boolean>(false);
+  const confirmMonth = () => setHasConfirmedMonth(true);
   
   const [userProfile, setUserProfile] = useState<UserProfile>({
     name: 'Thái Nguyệt Hoa',
@@ -411,6 +419,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   return (
     <StoreContext.Provider value={{
       selectedMonth, setSelectedMonth,
+      hasConfirmedMonth, confirmMonth,
       userProfile, setUserRole,
       storeItems, addStoreItem, updateStoreItem, deleteStoreItem,
       prItems, generatePRPOList, updatePRItem,
