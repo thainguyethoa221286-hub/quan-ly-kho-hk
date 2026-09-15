@@ -589,7 +589,7 @@ export default function StoreModule() {
                     <input
                       type="number"
                       data-field="Transfer"
-                      value={it.Transfer}
+                      value={it.Transfer || ''}
                       onChange={(e) => handleFieldChange(it.rowIndex, 'Transfer', e.target.value)}
                       onFocus={() => setFocusedRow(it.rowIndex)}
                       onKeyDown={(e) => handleGridKeyDown(e, 'Transfer')}
@@ -606,7 +606,7 @@ export default function StoreModule() {
                     }`}
                     title="Tự động đồng bộ từ Module Hư Hỏng & Thiệt Hại"
                   >
-                    {fmtNumber(it.HuHongMat)}
+                    {Number(it.HuHongMat) ? fmtNumber(it.HuHongMat) : ''}
                   </td>
                   <td className="border border-[#141414]/30 px-2 py-1 text-right font-semibold" title="Tự động tính = (Đầu kỳ + Nhập) − (Tồn + Transfer + Hư hỏng/mất)">
                     {fmtNumber(it.SuDung)}
@@ -619,7 +619,7 @@ export default function StoreModule() {
                     <input
                       type="number"
                       data-field="Ton"
-                      value={it.Ton}
+                      value={it.Ton || ''}
                       onChange={(e) => handleFieldChange(it.rowIndex, 'Ton', e.target.value)}
                       onFocus={() => setFocusedRow(it.rowIndex)}
                       onKeyDown={(e) => handleGridKeyDown(e, 'Ton')}
