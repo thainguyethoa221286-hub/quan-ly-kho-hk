@@ -10,10 +10,20 @@ import {
 } from '../../services/googleSheetsService';
 
 // ---------- Helpers ----------
+// Chuyển 1 giá trị (số, chuỗi "3,5" kiểu Việt, chuỗi "3.5"...) thành Number
+// thật — khớp với parseVN_ bên Code.gs, để 2 bên luôn tính ra cùng 1 kết quả.
+function parseVN(v) {
+  if (v === null || v === undefined || v === '') return 0;
+  if (typeof v === 'number') return isNaN(v) ? 0 : v;
+  const num = parseFloat(String(v).trim().replace(',', '.'));
+  return isNaN(num) ? 0 : num;
+}
+
 function computeDerived(item) {
-  const n = (v) => Number(v) || 0;
+  const n = parseVN;
   const suDung = (n(item.DauKy) + n(item.Nhap)) - (n(item.Ton) + n(item.Transfer) + n(item.HuHongMat));
-  const tongXuat = n(item.Nhap) + n(item.Transfer) + n(item.HuHongMat) + suDung;
+  // Tổng Xuất = Transfer + Hư Hỏng/Mất (KHÔNG cộng Nhập/Sử Dụng — đã chốt lại với Ms. Hoa)
+  const tongXuat = n(item.Transfer) + n(item.HuHongMat);
   const tongKho = n(item.Ton) + n(item.SetUp);
   const thanhTien = suDung * n(item.Cost);
   return { ...item, SuDung: suDung, TongXuat: tongXuat, TongKho: tongKho, ThanhTien: thanhTien };
