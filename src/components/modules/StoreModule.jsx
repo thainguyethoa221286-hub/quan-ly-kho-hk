@@ -576,7 +576,7 @@ export default function StoreModule() {
                     <input
                       type="number"
                       data-field="Nhap"
-                      value={it.Nhap}
+                      value={it.Nhap || ''}
                       onChange={(e) => handleFieldChange(it.rowIndex, 'Nhap', e.target.value)}
                       onFocus={() => setFocusedRow(it.rowIndex)}
                       onKeyDown={(e) => handleGridKeyDown(e, 'Nhap')}
