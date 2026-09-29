@@ -961,24 +961,24 @@ function SetupTab({ thang }) {
                   <td className="min-w-[180px] border border-slate-200 px-2 py-1 font-medium">{r.TenHang}</td>
                   {['FBTonDau', 'FBTonCuoi'].map((f) => (
                     <td key={f} className="border border-slate-200 p-0">
-                      <input type="number" data-field={f} value={r[f] === 0 ? '' : r[f]}
+                      <input type="number" data-field={f} value={r[f] === 0 || r[f] === '' || r[f] == null ? '' : r[f]}
                         onChange={(e) => handleFbfoChange(r.rowIndex, f, e.target.value)}
                         onKeyDown={(e) => gridKeyNav(e, f)}
                         onBlur={() => persistFbfoRow(r.rowIndex)}
-                        placeholder="0" className="w-16 bg-transparent px-1 py-1 text-center focus:bg-yellow-300 focus:outline-none" />
+                        className="w-16 bg-transparent px-1 py-1 text-center focus:bg-yellow-300 focus:outline-none" />
                     </td>
                   ))}
-                  <td className="border border-slate-200 px-2 py-1 text-center font-bold">{r.FBTransfer ? fmtNumber(r.FBTransfer) : ''}</td>
+                  <td className="border border-slate-200 px-2 py-1 text-center text-base font-bold text-red-600">{r.FBTransfer ? fmtNumber(r.FBTransfer) : ''}</td>
                   {['FOTonDau', 'FOTonCuoi'].map((f) => (
                     <td key={f} className="border border-slate-200 p-0">
-                      <input type="number" data-field={f} value={r[f] === 0 ? '' : r[f]}
+                      <input type="number" data-field={f} value={r[f] === 0 || r[f] === '' || r[f] == null ? '' : r[f]}
                         onChange={(e) => handleFbfoChange(r.rowIndex, f, e.target.value)}
                         onKeyDown={(e) => gridKeyNav(e, f)}
                         onBlur={() => persistFbfoRow(r.rowIndex)}
-                        placeholder="0" className="w-16 bg-transparent px-1 py-1 text-center focus:bg-yellow-300 focus:outline-none" />
+                        className="w-16 bg-transparent px-1 py-1 text-center focus:bg-yellow-300 focus:outline-none" />
                     </td>
                   ))}
-                  <td className="border border-slate-200 px-2 py-1 text-center font-bold">{r.FOTransfer ? fmtNumber(r.FOTransfer) : ''}</td>
+                  <td className="border border-slate-200 px-2 py-1 text-center text-base font-bold text-red-600">{r.FOTransfer ? fmtNumber(r.FOTransfer) : ''}</td>
                   <td className="border border-slate-200 p-0">
                     <input data-field="fbfo-ghichu" value={r.GhiChu || ''}
                       onChange={(e) => handleFbfoChange(r.rowIndex, 'GhiChu', e.target.value)}
