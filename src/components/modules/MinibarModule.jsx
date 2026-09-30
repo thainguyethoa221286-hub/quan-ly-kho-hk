@@ -11,7 +11,7 @@ import {
   getMinibarSetup, saveMinibarSetupItem,
   getMinibarFBFO, saveMinibarFBFOItem,
   getMinibarBills, saveMinibarBill, deleteMinibarBill,
-  getMinibarSummary, saveMinibarSummaryItem, rolloverMinibarMonth,
+  getMinibarSummary, saveMinibarSummaryItem,
 } from '../../services/googleSheetsService';
 
 const FLOORS = ['F1', 'F2', 'F3', 'F4', 'F5', 'F6', 'F7', 'F8', 'F9'];
@@ -285,8 +285,6 @@ function SummaryTab({ thang, catalog, onReloadCatalog }) {
   const [savingRows, setSavingRows] = useState({});
   const [showAddModal, setShowAddModal] = useState(false);
   const [showDiscrepancy, setShowDiscrepancy] = useState(false);
-  const [rolloverBusy, setRolloverBusy] = useState(false);
-  const [confirmRollover, setConfirmRollover] = useState(false);
   const [pmsRecords, setPmsRecords] = useState(null);
   const [pmsFileName, setPmsFileName] = useState('');
   const [pmsUploading, setPmsUploading] = useState(false);
@@ -371,19 +369,6 @@ function SummaryTab({ thang, catalog, onReloadCatalog }) {
     }
   };
 
-  const handleRollover = async () => {
-    setRolloverBusy(true);
-    setError(null);
-    try {
-      await rolloverMinibarMonth(thang, nextMonthStr(thang));
-      setConfirmRollover(false);
-      await load();
-    } catch (err) {
-      setError('Lỗi khi kết chuyển: ' + err.message);
-    } finally {
-      setRolloverBusy(false);
-    }
-  };
 
   const handleExportExcel = () => {
     const [y, m] = thang.split('-').map(Number);
@@ -435,9 +420,6 @@ function SummaryTab({ thang, catalog, onReloadCatalog }) {
           </button>
           <button onClick={() => window.print()} className="flex items-center gap-1 rounded border border-[#141414] bg-white px-3 py-1.5 text-xs font-bold hover:bg-[#E4E3E0]">
             <Printer className="h-3.5 w-3.5" /> In Báo Cáo A4
-          </button>
-          <button onClick={() => setConfirmRollover(true)} className="flex items-center gap-1 rounded bg-[#10B981] px-3 py-1.5 text-xs font-bold text-white hover:bg-emerald-700">
-            <RefreshCw className="h-3.5 w-3.5" /> Kết Chuyển Tháng Sau
           </button>
         </div>
       </div>
@@ -566,23 +548,6 @@ function SummaryTab({ thang, catalog, onReloadCatalog }) {
       {showDiscrepancy && <DiscrepancyModal items={items} onClose={() => setShowDiscrepancy(false)} />}
       {showPmsModal && <PMSReconciliationModal rows={pmsDiscrepancies} onClose={() => setShowPmsModal(false)} />}
 
-      {confirmRollover && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 print:hidden">
-          <div className="w-96 rounded-lg bg-white p-5 shadow-xl">
-            <h3 className="mb-2 text-base font-bold">Xác nhận kết chuyển tháng</h3>
-            <p className="mb-4 text-sm text-slate-600">
-              Tồn Thực Tế tháng <strong>{thang}</strong> sẽ trở thành Tồn Đầu tháng <strong>{nextMonthStr(thang)}</strong>.
-              Nhập/Tồn Kho MB tháng mới sẽ để trống chờ nhập lại. Không thể hoàn tác.
-            </p>
-            <div className="flex justify-end gap-2">
-              <button onClick={() => setConfirmRollover(false)} disabled={rolloverBusy} className="rounded border border-[#141414] px-3 py-1.5 text-sm">Huỷ</button>
-              <button onClick={handleRollover} disabled={rolloverBusy} className="flex items-center gap-1 rounded bg-[#10B981] px-3 py-1.5 text-sm font-bold text-white disabled:opacity-50">
-                {rolloverBusy && <Loader2 className="h-4 w-4 animate-spin" />} Xác nhận
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
