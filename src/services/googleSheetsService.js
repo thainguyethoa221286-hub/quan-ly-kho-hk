@@ -12,10 +12,40 @@ const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzmyZcMifCATWJN
 let jsonpCounter = 0;
 
 /**
- * Gọi Apps Script bằng JSONP. Trả về Promise resolve dữ liệu (data),
- * hoặc reject nếu success=false hoặc timeout.
+ * ---- Hàng đợi giới hạn số request chạy song song ----
+ * Khi người dùng sửa nhanh nhiều dòng/ô liên tiếp (ví dụ Tab qua 20 dòng
+ * trong bảng Kho), mỗi lần rời ô (onBlur) sẽ gọi lưu ngay lập tức, tạo ra
+ * hàng chục request JSONP cùng lúc. Google Apps Script Web App không xử lý
+ * tốt nhiều request đồng thời (bị nghẽn/timeout), đây là NGUYÊN NHÂN CHÍNH
+ * gây lỗi đỏ "Không kết nối được tới Google Apps Script" và làm app phải
+ * tải lại trang. Hàng đợi dưới đây giới hạn tối đa 3 request chạy song
+ * song, các request còn lại tự động chờ tới lượt thay vì bắn hết cùng lúc.
  */
-function jsonpRequest(params, timeoutMs = 15000) {
+const MAX_CONCURRENT_REQUESTS = 3;
+let activeRequestCount = 0;
+const requestQueue = [];
+
+function runNextInQueue() {
+  if (activeRequestCount >= MAX_CONCURRENT_REQUESTS || requestQueue.length === 0) return;
+  const task = requestQueue.shift();
+  activeRequestCount++;
+  task().finally(() => {
+    activeRequestCount--;
+    runNextInQueue();
+  });
+}
+
+function enqueueRequest(task) {
+  return new Promise((resolve, reject) => {
+    requestQueue.push(() => task().then(resolve, reject));
+    runNextInQueue();
+  });
+}
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/** Gọi Apps Script bằng JSONP đúng 1 lần (không hàng đợi, không thử lại). */
+function jsonpRequestOnce(params, timeoutMs) {
   return new Promise((resolve, reject) => {
     const callbackName = `gsCallback_${Date.now()}_${jsonpCounter++}`;
     const script = document.createElement('script');
@@ -50,6 +80,28 @@ function jsonpRequest(params, timeoutMs = 15000) {
   });
 }
 
+/**
+ * Gọi Apps Script bằng JSONP. Trả về Promise resolve dữ liệu (data).
+ * Có hàng đợi giới hạn 3 request song song (xem ghi chú ở trên) và tự động
+ * thử lại tối đa 2 lần (cách nhau 1.5s rồi 3s) nếu bị timeout/mất kết nối,
+ * trước khi thật sự báo lỗi cho người dùng — giúp giảm mạnh lỗi đỏ
+ * "Không kết nối được tới Google Apps Script" khi thao tác nhanh.
+ */
+function jsonpRequest(params, timeoutMs = 20000, retries = 2) {
+  return enqueueRequest(async () => {
+    let lastErr;
+    for (let attempt = 0; attempt <= retries; attempt++) {
+      try {
+        return await jsonpRequestOnce(params, timeoutMs);
+      } catch (err) {
+        lastErr = err;
+        if (attempt < retries) await sleep(1500 * (attempt + 1));
+      }
+    }
+    throw lastErr;
+  });
+}
+
 /** Lấy toàn bộ dữ liệu Kho của 1 tháng (VD: "2026-07") */
 export function getKhoData(thang) {
   return jsonpRequest({ action: 'getKho', thang });
@@ -79,7 +131,9 @@ export function listAvailableMonths() {
  * thời gian chờ dài hơn (60s) để tránh báo lỗi timeout giả trong khi
  * Google Sheets vẫn đang xử lý thành công phía sau. */
 export function rolloverMonth(fromThang, toThang) {
-  return jsonpRequest({ action: 'rolloverMonth', fromThang, toThang }, 60000);
+  // retries = 0: đây là thao tác không thể lặp lại an toàn (có thể tạo dữ liệu
+  // trùng nếu request đầu đã chạy xong ở backend nhưng phản hồi về chậm/mất).
+  return jsonpRequest({ action: 'rolloverMonth', fromThang, toThang }, 60000, 0);
 }
 
 /** ===== Module 02: Đề Xuất Mua Hàng PR-PO ===== */
@@ -101,7 +155,9 @@ export function setPRPOHidden(thang, rowIndex, hidden) {
 
 /** Tạo mặt hàng hoàn toàn mới — tự động thêm vào cả Module 01 (Kho) và Module 02 (PR-PO) */
 export function addNewItemFull(thang, tenHang, dvt) {
-  return jsonpRequest({ action: 'addNewItemFull', thang, tenHang, dvt });
+  // retries = 0: tránh tạo trùng mặt hàng nếu request đầu đã tạo xong ở
+  // backend nhưng phản hồi về chậm/mất.
+  return jsonpRequest({ action: 'addNewItemFull', thang, tenHang, dvt }, 20000, 0);
 }
 
 /** ===== Module 03: Báo Cáo Hư Hỏng / FOC ===== */
@@ -171,7 +227,7 @@ export function saveMinibarSummaryItem(thang, item) {
   return jsonpRequest({ action: 'saveMinibarSummaryItem', thang, item: JSON.stringify(item) });
 }
 export function rolloverMinibarMonth(fromThang, toThang) {
-  return jsonpRequest({ action: 'rolloverMinibarMonth', fromThang, toThang }, 60000);
+  return jsonpRequest({ action: 'rolloverMinibarMonth', fromThang, toThang }, 60000, 0);
 }
 
 /** ===== Module 05: Văn Phòng Phẩm (VPP) ===== */
@@ -185,7 +241,7 @@ export function deleteVPPItem(thang, rowIndex) {
   return jsonpRequest({ action: 'deleteVPPItem', thang, rowIndex });
 }
 export function rolloverVPPMonth(fromThang, toThang) {
-  return jsonpRequest({ action: 'rolloverVPPMonth', fromThang, toThang }, 60000);
+  return jsonpRequest({ action: 'rolloverVPPMonth', fromThang, toThang }, 60000, 0);
 }
 
 /** ===== Khoá Sổ Tháng (dùng chung toàn bộ 6 module) ===== */
