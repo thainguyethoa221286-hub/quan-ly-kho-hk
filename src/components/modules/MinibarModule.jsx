@@ -494,12 +494,12 @@ function SummaryTab({ thang, catalog, onReloadCatalog }) {
         </div>
       </div>
 
-      <div className="max-h-[calc(100vh-260px)] overflow-y-auto overflow-x-auto rounded border border-[#141414] bg-white">
+      <div className="max-h-[calc(100vh-260px)] overflow-y-auto overflow-x-auto rounded border border-[#141414] bg-white print:max-h-none print:overflow-visible">
         <table className="w-full border-collapse text-xs">
           <thead className="bg-slate-700 text-xs font-bold uppercase tracking-wide text-white">
             <tr>
-              {['STT', 'TÊN HÀNG MINIBAR', 'ĐVT', 'TỒN ĐẦU', 'NHẬP', 'BILLED', 'NO CHARGE', 'FOC', 'TRANS FO', 'TRANS FB', 'TỒN KHO MB', 'SETUP ROOM', 'TỒN TRÊN BÁO CÁO', 'TỒN THỰC TẾ', 'CHÊNH LỆCH', 'GHI CHÚ'].map((h, i) => (
-                <th key={h + i} className={`sticky top-0 z-20 border border-white/20 bg-slate-700 px-2 py-2 text-left shadow-[0_1px_0_0_#141414] ${i === 1 ? 'min-w-[200px]' : ''}`}>{h}</th>
+              {['STT', 'TÊN HÀNG MINIBAR', 'ĐVT', 'TỒN ĐẦU', 'NHẬP', 'TỒN KHO MB', 'BILLED', 'NO CHARGE', 'FOC', 'TRANS FO', 'TRANS FB', 'SETUP ROOM', 'TỒN TRÊN BÁO CÁO', 'TỒN THỰC TẾ', 'CHÊNH LỆCH', 'GHI CHÚ'].map((h, i) => (
+                <th key={h + i} className={`sticky top-0 z-20 border border-white/20 px-2 py-2 text-left shadow-[0_1px_0_0_#141414] ${i === 1 ? 'min-w-[200px]' : ''} ${i === 5 ? 'bg-yellow-200 text-[#141414]' : 'bg-slate-700'}`}>{h}</th>
               ))}
             </tr>
           </thead>
@@ -528,12 +528,7 @@ function SummaryTab({ thang, catalog, onReloadCatalog }) {
                         placeholder="0"
                         className="w-16 bg-transparent px-2 py-1 text-right focus:bg-yellow-300 focus:outline-none" />
                     </td>
-                    <td className="border border-[#141414]/30 px-2 py-1 text-right text-emerald-600">{fmtNumber(it.Billed)}</td>
-                    <td className="border border-[#141414]/30 px-2 py-1 text-right text-red-500">{fmtNumber(it.NoCharge)}</td>
-                    <td className="border border-[#141414]/30 px-2 py-1 text-right text-amber-600">{fmtNumber(it.FOC)}</td>
-                    <td className="border border-[#141414]/30 px-2 py-1 text-right">{fmtNumber(it.TransferFO)}</td>
-                    <td className="border border-[#141414]/30 px-2 py-1 text-right">{fmtNumber(it.TransferFB)}</td>
-                    <td className="border-2 border-[#141414] bg-yellow-50 p-0">
+                    <td className="border-2 border-[#141414] bg-yellow-100 p-0">
                       <input type="number" data-field="TonKho" value={it.TonKho === 0 ? '' : it.TonKho}
                         onChange={(e) => handleFieldChange(it.rowIndex, 'TonKho', e.target.value)}
                         onKeyDown={(e) => gridKeyNav(e, 'TonKho')}
@@ -541,6 +536,11 @@ function SummaryTab({ thang, catalog, onReloadCatalog }) {
                         placeholder="0"
                         className="w-16 bg-transparent px-2 py-1 text-right text-base font-bold focus:bg-yellow-300 focus:outline-none" />
                     </td>
+                    <td className="border border-[#141414]/30 px-2 py-1 text-right text-emerald-600">{fmtNumber(it.Billed)}</td>
+                    <td className="border border-[#141414]/30 px-2 py-1 text-right text-red-500">{fmtNumber(it.NoCharge)}</td>
+                    <td className="border border-[#141414]/30 px-2 py-1 text-right text-amber-600">{fmtNumber(it.FOC)}</td>
+                    <td className="border border-[#141414]/30 px-2 py-1 text-right">{fmtNumber(it.TransferFO)}</td>
+                    <td className="border border-[#141414]/30 px-2 py-1 text-right">{fmtNumber(it.TransferFB)}</td>
                     <td className="border border-[#141414]/30 px-2 py-1 text-right">{fmtNumber(it.SetupRoom)}</td>
                     <td className="border border-[#141414]/30 px-2 py-1 text-right font-semibold">{fmtNumber(it.TonSachVo)}</td>
                     <td className="border border-[#141414]/30 px-2 py-1 text-right font-semibold">{fmtNumber(it.TonThucTe)}</td>
@@ -905,7 +905,7 @@ function SetupTab({ thang }) {
         <h3 className="mb-3 flex items-center gap-2 text-sm font-bold uppercase text-[#141414]">
           <Layers className="h-4 w-4" /> Ma Trận Setup Theo Tầng
         </h3>
-        <div className="max-h-[420px] overflow-auto rounded border border-slate-200">
+        <div className="max-h-[420px] overflow-auto rounded border border-slate-200 print:max-h-none print:overflow-visible">
           <table className="w-full border-collapse text-xs">
             <thead className="bg-slate-700 text-xs font-bold uppercase tracking-wide text-white">
               <tr>
@@ -941,7 +941,7 @@ function SetupTab({ thang }) {
           <Coffee className="h-4 w-4" /> Bảng F&amp;B / FO
         </h3>
         <p className="mb-3 text-[11px] text-slate-400">Nhân viên tự cập nhật Tồn Đầu/Tồn Cuối mỗi tháng. Transfer tự tính = Tồn Đầu − Tồn Cuối.</p>
-        <div className="max-h-[380px] overflow-auto rounded border border-slate-200">
+        <div className="max-h-[380px] overflow-auto rounded border border-slate-200 print:max-h-none print:overflow-visible">
           <table className="w-full border-collapse text-xs">
             <thead className="bg-slate-700 text-xs font-bold uppercase tracking-wide text-white">
               <tr>
@@ -1033,11 +1033,15 @@ export default function MinibarModule() {
       <div className="mb-4 flex flex-wrap gap-1.5 print:hidden">
         {[
           { key: 'SUMMARY', label: 'BẢNG BÁO CÁO TỔNG MINIBAR', icon: Coffee },
-          { key: 'BILLS', label: 'GHI NHẬN DAILY BILLS', icon: Receipt },
+          { key: 'BILLS', label: 'GHI NHẬN DAILY BILLS', icon: Receipt, activeClass: 'bg-yellow-400 text-[#141414] border-yellow-400', inactiveClass: 'bg-yellow-100 text-[#141414] hover:bg-yellow-200 border-yellow-400' },
           { key: 'SETUP', label: 'SET UP MINIBAR PHÒNG KHÁCH', icon: Layers },
-        ].map(({ key, label, icon: Icon }) => (
+        ].map(({ key, label, icon: Icon, activeClass, inactiveClass }) => (
           <button key={key} onClick={() => setActiveTab(key)}
-            className={`flex items-center gap-2 rounded border border-[#141414] px-3.5 py-1.5 text-xs font-bold ${activeTab === key ? 'bg-[#141414] text-white' : 'bg-white text-[#141414] hover:bg-[#E4E3E0]'}`}>
+            className={`flex items-center gap-2 rounded border border-[#141414] px-3.5 py-1.5 text-xs font-bold ${
+              activeTab === key
+                ? (activeClass || 'bg-[#141414] text-white')
+                : (inactiveClass || 'bg-white text-[#141414] hover:bg-[#E4E3E0]')
+            }`}>
             <Icon className="h-4 w-4" /> {label}
           </button>
         ))}
