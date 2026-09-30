@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import {
-  BarChart3, Download, Printer, Eye, X, Loader2, Lock, Unlock,
+  BarChart3, Download, Printer, Eye, X, Loader2, Lock, Unlock, RefreshCw,
   AlertTriangle, Package, ShoppingCart, Coffee, FileText,
 } from 'lucide-react';
 import * as XLSX from 'xlsx-js-style';
@@ -10,8 +10,23 @@ import { getPRPOData } from '../../services/googleSheetsService';
 import { getDamageData } from '../../services/googleSheetsService';
 import { getMinibarSummary } from '../../services/googleSheetsService';
 import { getVPPData } from '../../services/googleSheetsService';
+import { rolloverMonth, rolloverMinibarMonth, rolloverVPPMonth } from '../../services/googleSheetsService';
 
 const fmtNumber = (v) => (Number(v) || 0).toLocaleString('vi-VN');
+
+function nextMonthStr(thang) {
+  const [y, m] = thang.split('-').map(Number);
+  const d = new Date(y, m, 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+
+/** 3 phân hệ có "kết chuyển tháng sau": Kho HK & Vật Tư, Minibar, VPP.
+ * (PR-PO và Hư Hỏng/FOC không có khái niệm kết chuyển tháng.) */
+const ROLLOVER_STEPS = [
+  { key: 'STORE', label: 'Kho HK & Vật Tư', run: rolloverMonth },
+  { key: 'MINIBAR', label: 'Minibar', run: rolloverMinibarMonth },
+  { key: 'VPP', label: 'Văn Phòng Phẩm (VPP)', run: rolloverVPPMonth },
+];
 
 // ---------- Cấu hình 5 phân hệ báo cáo ----------
 const REPORTS = [
@@ -223,7 +238,7 @@ async function exportMasterWorkbook(thang) {
 
 // ---------- Main Component ----------
 export default function DashboardModule() {
-  const { selectedMonth, isMonthLocked, toggleLockMonth } = useStore();
+  const { selectedMonth, setSelectedMonth, isMonthLocked, toggleLockMonth, canEdit } = useStore();
   const thang = selectedMonth;
 
   const [previewReport, setPreviewReport] = useState(null);
@@ -233,6 +248,44 @@ export default function DashboardModule() {
   const [kpiLoading, setKpiLoading] = useState(true);
   const [masterExporting, setMasterExporting] = useState(false);
   const [exportingKey, setExportingKey] = useState(null);
+
+  // ---- Kết chuyển tháng sau (gộp cả 3 phân hệ: Kho, Minibar, VPP) ----
+  const [confirmRolloverAll, setConfirmRolloverAll] = useState(false);
+  const [rolloverBusy, setRolloverBusy] = useState(false);
+  const [rolloverStepIdx, setRolloverStepIdx] = useState(-1);
+  const [rolloverDone, setRolloverDone] = useState([]);
+  const [rolloverError, setRolloverError] = useState(null);
+
+  const openRolloverModal = () => {
+    setRolloverError(null);
+    setRolloverDone([]);
+    setConfirmRolloverAll(true);
+  };
+
+  // Nếu bấm "Xác nhận" lại sau khi bị lỗi giữa chừng, CHỈ chạy tiếp các bước
+  // CHƯA xong (bỏ qua bước đã có dấu ✓) — tránh kết chuyển trùng 1 phân hệ
+  // 2 lần (rollover không phải thao tác có thể lặp lại an toàn).
+  const handleRolloverAll = async () => {
+    const toThang = nextMonthStr(thang);
+    setRolloverBusy(true);
+    setRolloverError(null);
+    try {
+      for (let i = 0; i < ROLLOVER_STEPS.length; i++) {
+        if (rolloverDone.includes(ROLLOVER_STEPS[i].key)) continue;
+        setRolloverStepIdx(i);
+        // eslint-disable-next-line no-await-in-loop
+        await ROLLOVER_STEPS[i].run(thang, toThang);
+        setRolloverDone((prev) => [...prev, ROLLOVER_STEPS[i].key]);
+      }
+      setConfirmRolloverAll(false);
+      setSelectedMonth(toThang);
+    } catch (err) {
+      setRolloverError(err.message);
+    } finally {
+      setRolloverBusy(false);
+      setRolloverStepIdx(-1);
+    }
+  };
 
   React.useEffect(() => {
     let cancelled = false;
@@ -292,6 +345,11 @@ export default function DashboardModule() {
             {isMonthLocked ? <Lock className="h-3.5 w-3.5" /> : <Unlock className="h-3.5 w-3.5" />}
             {isMonthLocked ? 'Đã Khoá Sổ' : 'Phê Duyệt & Khoá Số Liệu Tháng'}
           </button>
+          {canEdit && (
+            <button onClick={openRolloverModal} className="flex items-center gap-1 rounded bg-amber-500 px-3 py-1.5 text-xs font-bold text-white hover:bg-amber-600">
+              <RefreshCw className="h-3.5 w-3.5" /> Kết Chuyển Tháng Sau (Tất Cả)
+            </button>
+          )}
         </div>
       </div>
 
@@ -355,6 +413,68 @@ export default function DashboardModule() {
           autoPrint={autoPrint}
           onClose={() => { setPreviewReport(null); setAutoPrint(false); }}
         />
+      )}
+
+      {confirmRolloverAll && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 print:hidden">
+          <div className="w-[420px] rounded-lg bg-white p-5 shadow-xl">
+            <h3 className="mb-2 text-base font-bold">Xác nhận kết chuyển tháng sau (tất cả)</h3>
+            <p className="mb-3 text-sm text-slate-600">
+              Sẽ kết chuyển cùng lúc <strong>3 phân hệ</strong> từ tháng <strong>{thang}</strong> sang tháng{' '}
+              <strong>{nextMonthStr(thang)}</strong>:
+            </p>
+            <ul className="mb-4 space-y-1 text-sm">
+              {ROLLOVER_STEPS.map((step, i) => {
+                const isDone = rolloverDone.includes(step.key);
+                const isRunning = rolloverBusy && rolloverStepIdx === i;
+                return (
+                  <li key={step.key} className="flex items-center gap-2">
+                    {isDone ? (
+                      <span className="text-emerald-600">✓</span>
+                    ) : isRunning ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin text-amber-600" />
+                    ) : (
+                      <span className="h-1.5 w-1.5 rounded-full bg-slate-300" />
+                    )}
+                    <span className={isDone ? 'text-emerald-700' : 'text-slate-700'}>{step.label}</span>
+                  </li>
+                );
+              })}
+            </ul>
+            <p className="mb-4 text-xs text-slate-400">
+              (PR-PO và Hư Hỏng/FOC không có kết chuyển tháng, không bị ảnh hưởng.) Thao tác này không thể hoàn tác.
+            </p>
+            {rolloverBusy && (
+              <p className="mb-3 flex items-center gap-2 rounded bg-amber-50 px-3 py-2 text-xs font-medium text-amber-700">
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                Đang kết chuyển, vui lòng đợi — có thể mất 1-2 phút cho cả 3 phân hệ...
+              </p>
+            )}
+            {rolloverError && (
+              <p className="mb-3 rounded bg-red-50 px-3 py-2 text-xs font-medium text-red-700">
+                Lỗi: {rolloverError}. Các phân hệ đã có dấu ✓ ở trên đã kết chuyển xong — chỉ cần bấm
+                "Xác nhận" lại để tiếp tục, không cần lo bị kết chuyển trùng.
+              </p>
+            )}
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setConfirmRolloverAll(false)}
+                disabled={rolloverBusy}
+                className="rounded border border-[#141414] px-3 py-1.5 text-sm"
+              >
+                Huỷ
+              </button>
+              <button
+                onClick={handleRolloverAll}
+                disabled={rolloverBusy}
+                className="flex items-center gap-1 rounded bg-amber-500 px-3 py-1.5 text-sm font-bold text-white disabled:opacity-50"
+              >
+                {rolloverBusy && <Loader2 className="h-4 w-4 animate-spin" />}
+                Xác nhận kết chuyển
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
