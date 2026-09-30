@@ -63,6 +63,16 @@ function AppContent() {
   const [activeModule, setActiveModule] = useState<ActiveModule>('MODULE_01_STORE');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
+  // Phân hệ nào đã từng mở thì giữ nguyên trong bộ nhớ (không unmount khi
+  // chuyển sang phân hệ khác) — bấm qua lại giữa các mục ở Sidebar (Kho,
+  // PR-PO, Hư Hỏng, Minibar, VPP, Báo Cáo Tổng Hợp) sẽ tức thời từ lần thứ 2
+  // trở đi, không phải đọc lại dữ liệu từ Google Sheets mỗi lần bấm.
+  const [visitedModules, setVisitedModules] = useState<Record<string, boolean>>({ MODULE_01_STORE: true });
+  const goToModule = (m: ActiveModule) => {
+    setActiveModule(m);
+    setVisitedModules((prev) => (prev[m] ? prev : { ...prev, [m]: true }));
+  };
+
   if (!hasConfirmedMonth) {
     return <StartupMonthModal />;
   }
@@ -79,7 +89,7 @@ function AppContent() {
         {/* Left Collapsible Navigation Sidebar */}
         <Sidebar
           activeModule={activeModule}
-          setActiveModule={setActiveModule}
+          setActiveModule={goToModule}
           isCollapsed={isSidebarCollapsed}
           setIsCollapsed={setIsSidebarCollapsed}
         />
@@ -87,13 +97,25 @@ function AppContent() {
         {/* Main Module Content Screen */}
         <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto bg-[#E4E3E0] print:overflow-visible print:h-auto print:p-0 print:bg-white">
           <div className="max-w-7xl mx-auto print:max-w-none">
-            
-           {activeModule === 'MODULE_01_STORE' && <StoreModule />}
-            {activeModule === 'MODULE_02_PRPO' && <PRPOModule />}
-            {activeModule === 'MODULE_03_DAMAGE' && <LossDamageModule />}
-            {activeModule === 'MODULE_04_MINIBAR' && <MinibarModule />}
-            {activeModule === 'MODULE_05_VPP' && <OfficeSuppliesModule />}
-            {activeModule === 'MODULE_06_DASHBOARD' && <DashboardModule />}
+
+            {visitedModules.MODULE_01_STORE && (
+              <div className={activeModule === 'MODULE_01_STORE' ? '' : 'hidden'}><StoreModule /></div>
+            )}
+            {visitedModules.MODULE_02_PRPO && (
+              <div className={activeModule === 'MODULE_02_PRPO' ? '' : 'hidden'}><PRPOModule /></div>
+            )}
+            {visitedModules.MODULE_03_DAMAGE && (
+              <div className={activeModule === 'MODULE_03_DAMAGE' ? '' : 'hidden'}><LossDamageModule /></div>
+            )}
+            {visitedModules.MODULE_04_MINIBAR && (
+              <div className={activeModule === 'MODULE_04_MINIBAR' ? '' : 'hidden'}><MinibarModule /></div>
+            )}
+            {visitedModules.MODULE_05_VPP && (
+              <div className={activeModule === 'MODULE_05_VPP' ? '' : 'hidden'}><OfficeSuppliesModule /></div>
+            )}
+            {visitedModules.MODULE_06_DASHBOARD && (
+              <div className={activeModule === 'MODULE_06_DASHBOARD' ? '' : 'hidden'}><DashboardModule /></div>
+            )}
 
           </div>
         </main>
