@@ -175,6 +175,11 @@ export default function StoreModule() {
   const [confirmDeleteItem, setConfirmDeleteItem] = useState(null);
   const [showExportModal, setShowExportModal] = useState(false);
   const [focusedRow, setFocusedRow] = useState(null);
+  // Các dòng lưu bị lỗi (chưa tới được Google Sheets) — giữ danh sách này để
+  // (1) tô đỏ báo cho biết dòng nào CHƯA lưu thật sự, (2) cho bấm "Lưu Lại"
+  // gửi lại đúng các dòng đó mà không cần gõ lại từ đầu, và (3) cảnh báo
+  // trước khi rời/tải lại trang để tránh mất dữ liệu đã gõ nhưng chưa lưu.
+  const [failedRows, setFailedRows] = useState({});
 
   /**
    * Điều hướng bằng phím khi đang nhập liệu trong lưới:
@@ -253,8 +258,18 @@ export default function StoreModule() {
     try {
       const saved = await saveKhoItem(thang, item);
       setItems((prev) => prev.map((it) => (it.rowIndex === rowIndex ? { ...it, ...saved } : it)));
+      setFailedRows((s) => {
+        if (!s[rowIndex]) return s;
+        const copy = { ...s };
+        delete copy[rowIndex];
+        return copy;
+      });
     } catch (err) {
       setError('Lỗi khi lưu: ' + err.message);
+      // Đánh dấu dòng này CHƯA lưu được — dữ liệu vẫn còn nguyên trên màn
+      // hình (chưa mất), chỉ là chưa tới được Google Sheets. Có nút "Lưu
+      // Lại Các Dòng Lỗi" ở banner đỏ để gửi lại mà không cần gõ lại.
+      setFailedRows((s) => ({ ...s, [rowIndex]: true }));
     } finally {
       setSavingRows((s) => {
         const copy = { ...s };
@@ -263,6 +278,29 @@ export default function StoreModule() {
       });
     }
   };
+
+  const failedRowIndexes = Object.keys(failedRows).map(Number);
+
+  const handleRetryFailedRows = async () => {
+    setError(null);
+    for (const rowIndex of failedRowIndexes) {
+      // eslint-disable-next-line no-await-in-loop
+      await handleFieldBlur(rowIndex);
+    }
+  };
+
+  // Cảnh báo trước khi rời/tải lại trang nếu còn dòng chưa lưu được — đây
+  // chính là tình huống "reset lại thì mất dữ liệu": refresh trang sẽ đọc
+  // lại từ Google Sheets và ghi đè mất phần chưa lưu, nên phải chặn trước.
+  useEffect(() => {
+    const handler = (e) => {
+      if (failedRowIndexes.length === 0) return;
+      e.preventDefault();
+      e.returnValue = '';
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [failedRowIndexes.length]);
 
   const handleDelete = async (rowIndex) => {
     try {
@@ -484,9 +522,25 @@ export default function StoreModule() {
       </div>
 
       {error && (
-        <div className="mb-3 flex items-center justify-between rounded border border-red-500 bg-red-50 px-3 py-2 text-sm text-red-700 print:hidden">
-          <span>{error}</span>
-          <button onClick={() => setError(null)}><X className="h-4 w-4" /></button>
+        <div className="mb-3 rounded border border-red-500 bg-red-50 px-3 py-2 text-sm text-red-700 print:hidden">
+          <div className="flex items-center justify-between">
+            <span>{error}</span>
+            <button onClick={() => setError(null)}><X className="h-4 w-4" /></button>
+          </div>
+          {failedRowIndexes.length > 0 && (
+            <div className="mt-2 flex items-center justify-between gap-2 rounded bg-white/60 px-2 py-1.5">
+              <span className="text-xs">
+                Còn <strong>{failedRowIndexes.length}</strong> dòng (tô viền đỏ trong bảng) CHƯA lưu được —
+                dữ liệu vẫn còn trên màn hình, đừng tải lại trang kẻo mất. Bấm nút bên cạnh để lưu lại.
+              </span>
+              <button
+                onClick={handleRetryFailedRows}
+                className="flex shrink-0 items-center gap-1 rounded bg-red-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-red-700"
+              >
+                <RefreshCw className="h-3.5 w-3.5" /> Lưu Lại Các Dòng Lỗi
+              </button>
+            </div>
+          )}
         </div>
       )}
 
@@ -531,7 +585,12 @@ export default function StoreModule() {
               filteredItems.map((it, idx) => (
                 <tr
                   key={it.rowIndex}
-                  className={`transition-colors hover:bg-amber-100 ${savingRows[it.rowIndex] ? 'opacity-50' : idx % 2 === 0 ? 'bg-white' : 'bg-slate-50'}`}
+                  title={failedRows[it.rowIndex] ? 'Dòng này chưa lưu được — bấm "Lưu Lại Các Dòng Lỗi" ở banner đỏ phía trên' : undefined}
+                  className={`transition-colors hover:bg-amber-100 ${
+                    failedRows[it.rowIndex]
+                      ? 'bg-red-50 outline outline-2 -outline-offset-2 outline-red-400'
+                      : savingRows[it.rowIndex] ? 'opacity-50' : idx % 2 === 0 ? 'bg-white' : 'bg-slate-50'
+                  }`}
                 >
                   <td className="border border-[#141414]/30 px-2 py-1">{it.Stt}</td>
                   <td
