@@ -6,13 +6,14 @@ import {
 import * as XLSX from 'xlsx-js-style';
 import { useStore } from '../../context/StoreContext';
 import { parsePMSPdfFile, normalizeMinibarItemName } from '../../services/pmsPdfParser';
+// ⚠️ BẢN THỬ NGHIỆM (nhánh supabase-pilot): đọc/ghi qua Supabase.
 import {
   getMinibarCatalog, saveMinibarCatalogItem,
   getMinibarSetup, saveMinibarSetupItem,
   getMinibarFBFO, saveMinibarFBFOItem,
   getMinibarBills, saveMinibarBill, deleteMinibarBill,
   getMinibarSummary, saveMinibarSummaryItem,
-} from '../../services/googleSheetsService';
+} from '../../services/supabaseMinibarService';
 
 const FLOORS = ['F1', 'F2', 'F3', 'F4', 'F5', 'F6', 'F7', 'F8', 'F9'];
 const fmtNumber = (v) => (Number(v) || 0).toLocaleString('vi-VN');

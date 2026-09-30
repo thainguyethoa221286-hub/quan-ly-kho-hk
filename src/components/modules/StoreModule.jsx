@@ -2,11 +2,14 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Search, Plus, Trash2, Download, Printer, RefreshCw, Loader2, X, Eye, EyeOff, AlertTriangle } from 'lucide-react';
 import * as XLSX from 'xlsx-js-style';
 import { useStore } from '../../context/StoreContext';
+// ⚠️ BẢN THỬ NGHIỆM (nhánh supabase-pilot): đang đọc/ghi qua Supabase thay
+// vì Google Sheets + Apps Script — chỉ đổi nguồn import, code còn lại của
+// module này giữ nguyên 100% không đổi gì cả.
 import {
   getKhoData,
   saveKhoItem,
   deleteKhoItem,
-} from '../../services/googleSheetsService';
+} from '../../services/supabaseStoreService';
 
 // ---------- Helpers ----------
 // Chuyển 1 giá trị (số, chuỗi "3,5" kiểu Việt, chuỗi "3.5"...) thành Number

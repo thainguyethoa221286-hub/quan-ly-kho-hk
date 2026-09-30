@@ -8,7 +8,8 @@ import {
   INITIAL_ROOM_SETUPS, INITIAL_DAMAGE_RECORDS, 
   INITIAL_VPP_ITEMS, INITIAL_DAILY_BILLS 
 } from '../data/mockData';
-import { getMonthLockStatus, setMonthLockStatus } from '../services/googleSheetsService';
+// ⚠️ BẢN THỬ NGHIỆM (nhánh supabase-pilot): đọc/ghi qua Supabase.
+import { getMonthLockStatus, setMonthLockStatus } from '../services/supabaseMonthLockService';
 
 // ⚠️ MẬT KHẨU CHẾ ĐỘ QUẢN LÝ — đổi trực tiếp chuỗi này nếu muốn đổi mật khẩu.
 // Ai gõ đúng mật khẩu này sẽ chuyển App sang chế độ "Quản Lý" (sửa được dữ liệu).

@@ -2,13 +2,14 @@ import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { ShoppingCart, Download, Printer, Loader2, X, AlertTriangle, Plus, Search, ChevronDown, EyeOff } from 'lucide-react';
 import * as XLSX from 'xlsx-js-style';
 import { useStore } from '../../context/StoreContext';
+// ⚠️ BẢN THỬ NGHIỆM (nhánh supabase-pilot): đọc/ghi qua Supabase.
+import { getKhoData } from '../../services/supabaseStoreService';
 import {
-  getKhoData,
   getPRPOData,
   savePRPOItem,
   setPRPOHidden,
   addNewItemFull,
-} from '../../services/googleSheetsService';
+} from '../../services/supabasePRPOService';
 
 const fmtNumber = (v) => (Number(v) || 0).toLocaleString('vi-VN');
 

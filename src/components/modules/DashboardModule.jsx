@@ -5,12 +5,12 @@ import {
 } from 'lucide-react';
 import * as XLSX from 'xlsx-js-style';
 import { useStore } from '../../context/StoreContext';
-import { getKhoData } from '../../services/googleSheetsService';
-import { getPRPOData } from '../../services/googleSheetsService';
-import { getDamageData } from '../../services/googleSheetsService';
-import { getMinibarSummary } from '../../services/googleSheetsService';
-import { getVPPData } from '../../services/googleSheetsService';
-import { rolloverMonth, rolloverMinibarMonth, rolloverVPPMonth } from '../../services/googleSheetsService';
+// ⚠️ BẢN THỬ NGHIỆM (nhánh supabase-pilot): đọc/ghi qua Supabase.
+import { getKhoData, rolloverMonth } from '../../services/supabaseStoreService';
+import { getPRPOData } from '../../services/supabasePRPOService';
+import { getDamageData } from '../../services/supabaseDamageService';
+import { getMinibarSummary, rolloverMinibarMonth } from '../../services/supabaseMinibarService';
+import { getVPPData, rolloverVPPMonth } from '../../services/supabaseVPPService';
 
 const fmtNumber = (v) => (Number(v) || 0).toLocaleString('vi-VN');
 

@@ -2,7 +2,8 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { FileText, Download, Printer, Loader2, X, Plus, RefreshCw, Trash2 } from 'lucide-react';
 import * as XLSX from 'xlsx-js-style';
 import { useStore } from '../../context/StoreContext';
-import { getVPPData, saveVPPItem, deleteVPPItem } from '../../services/googleSheetsService';
+// ⚠️ BẢN THỬ NGHIỆM (nhánh supabase-pilot): đọc/ghi qua Supabase.
+import { getVPPData, saveVPPItem, deleteVPPItem } from '../../services/supabaseVPPService';
 
 const fmtNumber = (v) => (Number(v) || 0).toLocaleString('vi-VN');
 const nextMonthStr = (thang) => {
