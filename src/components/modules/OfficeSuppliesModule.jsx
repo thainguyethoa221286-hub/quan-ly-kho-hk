@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { FileText, Download, Printer, Loader2, X, Plus, RefreshCw, Trash2 } from 'lucide-react';
 import * as XLSX from 'xlsx-js-style';
 import { useStore } from '../../context/StoreContext';
-import { getVPPData, saveVPPItem, deleteVPPItem, rolloverVPPMonth } from '../../services/googleSheetsService';
+import { getVPPData, saveVPPItem, deleteVPPItem } from '../../services/googleSheetsService';
 
 const fmtNumber = (v) => (Number(v) || 0).toLocaleString('vi-VN');
 const nextMonthStr = (thang) => {
@@ -77,8 +77,6 @@ export default function OfficeSuppliesModule() {
   const [error, setError] = useState(null);
   const [savingRows, setSavingRows] = useState({});
   const [showAddModal, setShowAddModal] = useState(false);
-  const [rolloverBusy, setRolloverBusy] = useState(false);
-  const [confirmRollover, setConfirmRollover] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -143,19 +141,6 @@ export default function OfficeSuppliesModule() {
     }
   };
 
-  const handleRollover = async () => {
-    setRolloverBusy(true);
-    setError(null);
-    try {
-      await rolloverVPPMonth(thang, nextMonthStr(thang));
-      setConfirmRollover(false);
-      await load();
-    } catch (err) {
-      setError('Lỗi khi kết chuyển: ' + err.message);
-    } finally {
-      setRolloverBusy(false);
-    }
-  };
 
   const handleExportExcel = () => {
     const [y, m] = thang.split('-').map(Number);
@@ -218,9 +203,6 @@ export default function OfficeSuppliesModule() {
           </button>
           <button onClick={() => window.print()} className="flex items-center gap-1 rounded border border-[#141414] bg-white px-3 py-1.5 text-xs font-bold hover:bg-[#E4E3E0]">
             <Printer className="h-3.5 w-3.5" /> In Báo Cáo
-          </button>
-          <button onClick={() => setConfirmRollover(true)} className="flex items-center gap-1 rounded bg-[#10B981] px-3 py-1.5 text-xs font-bold text-white hover:bg-emerald-700">
-            <RefreshCw className="h-3.5 w-3.5" /> Kết Chuyển Tháng Sau
           </button>
         </div>
       </div>
@@ -299,23 +281,6 @@ export default function OfficeSuppliesModule() {
 
       {showAddModal && <AddVPPItemModal onCancel={() => setShowAddModal(false)} onConfirm={handleAddItem} />}
 
-      {confirmRollover && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 print:hidden">
-          <div className="w-96 rounded-lg bg-white p-5 shadow-xl">
-            <h3 className="mb-2 text-base font-bold">Xác nhận kết chuyển tháng</h3>
-            <p className="mb-4 text-sm text-slate-600">
-              Tồn Cuối Kỳ tháng <strong>{thang}</strong> sẽ trở thành Tồn Đầu tháng <strong>{nextMonthStr(thang)}</strong>.
-              Nhập/Tồn Cuối Kỳ tháng mới sẽ để trống chờ nhập lại. Không thể hoàn tác.
-            </p>
-            <div className="flex justify-end gap-2">
-              <button onClick={() => setConfirmRollover(false)} disabled={rolloverBusy} className="rounded border border-[#141414] px-3 py-1.5 text-sm">Huỷ</button>
-              <button onClick={handleRollover} disabled={rolloverBusy} className="flex items-center gap-1 rounded bg-[#10B981] px-3 py-1.5 text-sm font-bold text-white disabled:opacity-50">
-                {rolloverBusy && <Loader2 className="h-4 w-4 animate-spin" />} Xác nhận
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
