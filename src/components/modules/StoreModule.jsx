@@ -18,6 +18,15 @@ function parseVN(v) {
   return isNaN(num) ? 0 : num;
 }
 
+// Giá trị hiển thị trong ô input số: chỉ để trống khi THỰC SỰ chưa có dữ
+// liệu (null/undefined/''); số 0 vẫn phải hiện ra là "0". Trước đây dùng
+// `value={it.Ton || ''}` khiến số 0 (kiểu number, ví dụ sau khi lưu xong
+// server trả về) bị coi là falsy nên ô tự động hiện TRỐNG dù đã lưu đúng —
+// làm người dùng tưởng chưa lưu được, gõ lại số 0 nhiều lần, dồn request.
+function inputVal(v) {
+  return v === null || v === undefined || v === '' ? '' : v;
+}
+
 function computeDerived(item) {
   const n = parseVN;
   const suDung = (n(item.DauKy) + n(item.Nhap)) - (n(item.Ton) + n(item.Transfer) + n(item.HuHongMat));
@@ -611,7 +620,7 @@ export default function StoreModule() {
                     <input
                       type="number"
                       data-field="Nhap"
-                      value={it.Nhap || ''}
+                      value={inputVal(it.Nhap)}
                       onChange={(e) => handleFieldChange(it.rowIndex, 'Nhap', e.target.value)}
                       onFocus={() => setFocusedRow(it.rowIndex)}
                       onKeyDown={(e) => handleGridKeyDown(e, 'Nhap')}
@@ -626,7 +635,7 @@ export default function StoreModule() {
                     <input
                       type="number"
                       data-field="Ton"
-                      value={it.Ton || ''}
+                      value={inputVal(it.Ton)}
                       onChange={(e) => handleFieldChange(it.rowIndex, 'Ton', e.target.value)}
                       onFocus={() => setFocusedRow(it.rowIndex)}
                       onKeyDown={(e) => handleGridKeyDown(e, 'Ton')}
@@ -640,7 +649,7 @@ export default function StoreModule() {
                     <input
                       type="number"
                       data-field="Transfer"
-                      value={it.Transfer || ''}
+                      value={inputVal(it.Transfer)}
                       onChange={(e) => handleFieldChange(it.rowIndex, 'Transfer', e.target.value)}
                       onFocus={() => setFocusedRow(it.rowIndex)}
                       onKeyDown={(e) => handleGridKeyDown(e, 'Transfer')}
