@@ -3,6 +3,7 @@ import { useStore } from '../../context/StoreContext';
 import {
   Building2, Calendar, Lock, Unlock, RefreshCw, UserCheck, ShieldCheck, Eye, KeyRound, X, LogOut
 } from 'lucide-react';
+import { getMonthOptions, formatMonthLabel } from '../../utils/monthOptions';
 
 // ---------- Modal nhập mật khẩu để mở Chế Độ Quản Lý ----------
 function ManagerPasswordModal({ onCancel, onConfirm }) {
@@ -91,11 +92,9 @@ export const Navbar: React.FC = () => {
             onChange={(e) => setSelectedMonth(e.target.value)}
             className="bg-white text-[#141414] text-xs font-mono font-bold px-3 py-1.5 border border-[#141414] focus:outline-none focus:ring-2 focus:ring-[#141414] cursor-pointer"
           >
-            <option value="2026-05">Tháng 05/2026</option>
-            <option value="2026-06">Tháng 06/2026</option>
-            <option value="2026-07">Tháng 07/2026</option>
-            <option value="2026-08">Tháng 08/2026</option>
-            <option value="2026-09">Tháng 09/2026</option>
+            {getMonthOptions().map((m) => (
+              <option key={m} value={m}>{formatMonthLabel(m)}</option>
+            ))}
           </select>
 
           {/* Nút chính: Chưa mở Chế Độ Quản Lý -> yêu cầu mật khẩu */}
