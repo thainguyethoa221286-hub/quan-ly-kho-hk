@@ -278,9 +278,10 @@ function PMSReconciliationModal({ rows, onClose }) {
   );
 }
 
-function SummaryTab({ thang, catalog, onReloadCatalog }) {
+function SummaryTab({ thang, catalog, onReloadCatalog, refreshToken }) {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
   const [savingRows, setSavingRows] = useState({});
   const [showAddModal, setShowAddModal] = useState(false);
@@ -292,8 +293,12 @@ function SummaryTab({ thang, catalog, onReloadCatalog }) {
   const [showPmsModal, setShowPmsModal] = useState(false);
   const [bills, setBills] = useState([]);
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  // background = true: làm mới ngầm phía sau (không hiện spinner toàn màn
+  // hình, giữ nguyên bảng cũ đang hiện) — dùng khi Daily Bills vừa post 1
+  // bill mới, để Bảng Báo Cáo Tổng luôn có số liệu mới nhất mà không làm
+  // gián đoạn người đang xem.
+  const load = useCallback(async (background) => {
+    if (background) setRefreshing(true); else setLoading(true);
     setError(null);
     try {
       const [data, billsData] = await Promise.all([getMinibarSummary(thang), getMinibarBills(thang)]);
@@ -302,11 +307,13 @@ function SummaryTab({ thang, catalog, onReloadCatalog }) {
     } catch (err) {
       setError(err.message);
     } finally {
-      setLoading(false);
+      if (background) setRefreshing(false); else setLoading(false);
     }
   }, [thang]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { load(false); }, [load]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { if (refreshToken) load(true); }, [refreshToken]);
   useEffect(() => { setPmsRecords(null); setPmsFileName(''); }, [thang]);
 
   const pmsDiscrepancies = useMemo(() => {
@@ -405,6 +412,11 @@ function SummaryTab({ thang, catalog, onReloadCatalog }) {
   return (
     <div>
       <style>{hideSpinnerCSS}</style>
+      {refreshing && (
+        <p className="mb-2 flex items-center gap-1.5 text-[11px] font-medium text-slate-400 print:hidden">
+          <Loader2 className="h-3 w-3 animate-spin" /> Đang cập nhật số liệu mới nhất...
+        </p>
+      )}
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2 print:hidden">
         <button onClick={() => setShowAddModal(true)} className="flex items-center gap-1 rounded border border-[#141414] bg-white px-3 py-1.5 text-xs font-bold hover:bg-[#E4E3E0]">
           <Plus className="h-3.5 w-3.5" /> Thêm Item Minibar
@@ -555,7 +567,7 @@ function SummaryTab({ thang, catalog, onReloadCatalog }) {
 // ==================================================================
 // SUB 4A: Ghi Nhận Daily Bills
 // ==================================================================
-function DailyBillsTab({ thang, catalog }) {
+function DailyBillsTab({ thang, catalog, onBillsChanged }) {
   const [bills, setBills] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -629,6 +641,7 @@ function DailyBillsTab({ thang, catalog }) {
       await saveMinibarBill(thang, { billId: editingBillId, phong, ngay, tang: '', nguoiBaoCao, items, ghiChu: '' });
       resetForm();
       await load();
+      onBillsChanged?.(); // báo cho Bảng Báo Cáo Tổng tự cập nhật ngầm
     } catch (err) {
       setError('Lỗi khi Post Bill: ' + err.message);
     } finally {
@@ -652,6 +665,7 @@ function DailyBillsTab({ thang, catalog }) {
     try {
       await deleteMinibarBill(thang, billId);
       setBills((prev) => prev.filter((r) => r.BillId !== billId));
+      onBillsChanged?.(); // báo cho Bảng Báo Cáo Tổng tự cập nhật ngầm
     } catch (err) {
       setError('Lỗi khi xoá: ' + err.message);
     }
@@ -971,6 +985,22 @@ export default function MinibarModule() {
   const [catalog, setCatalog] = useState([]);
   const [catalogLoaded, setCatalogLoaded] = useState(false);
 
+  // Tab nào đã từng mở thì giữ nguyên trong bộ nhớ (không unmount khi chuyển
+  // sang tab khác) — chuyển qua lại giữa các tab sẽ tức thời, không phải tải
+  // lại dữ liệu từ Google Sheets mỗi lần bấm (nguyên nhân chính gây cảm giác
+  // "đọc lâu" khi chuyển từ Daily Bills sang Báo Cáo Tổng).
+  const [visitedTabs, setVisitedTabs] = useState({ SUMMARY: true });
+  const goToTab = (key) => {
+    setActiveTab(key);
+    setVisitedTabs((prev) => (prev[key] ? prev : { ...prev, [key]: true }));
+  };
+
+  // Tăng số này mỗi khi Daily Bills có thay đổi (post/sửa/xoá bill) để báo
+  // cho Bảng Báo Cáo Tổng tự làm mới ngầm — không cần đợi người dùng bấm
+  // qua tab đó mới thấy số liệu mới nhất.
+  const [billsChangedToken, setBillsChangedToken] = useState(0);
+  const notifyBillsChanged = () => setBillsChangedToken((t) => t + 1);
+
   const loadCatalog = useCallback(async () => {
     try {
       const data = await getMinibarCatalog();
@@ -1001,7 +1031,7 @@ export default function MinibarModule() {
           { key: 'BILLS', label: 'GHI NHẬN DAILY BILLS', icon: Receipt, activeClass: 'bg-yellow-400 text-[#141414] border-yellow-400', inactiveClass: 'bg-yellow-100 text-[#141414] hover:bg-yellow-200 border-yellow-400' },
           { key: 'SETUP', label: 'SET UP MINIBAR PHÒNG KHÁCH', icon: Layers },
         ].map(({ key, label, icon: Icon, activeClass, inactiveClass }) => (
-          <button key={key} onClick={() => setActiveTab(key)}
+          <button key={key} onClick={() => goToTab(key)}
             className={`flex items-center gap-2 rounded border border-[#141414] px-3.5 py-1.5 text-xs font-bold ${
               activeTab === key
                 ? (activeClass || 'bg-[#141414] text-white')
@@ -1016,9 +1046,21 @@ export default function MinibarModule() {
         <div className="py-16 text-center text-slate-400"><Loader2 className="mx-auto h-6 w-6 animate-spin" /></div>
       ) : (
         <>
-          {activeTab === 'SUMMARY' && <SummaryTab thang={thang} catalog={catalog} onReloadCatalog={loadCatalog} />}
-          {activeTab === 'BILLS' && <DailyBillsTab thang={thang} catalog={catalog} />}
-          {activeTab === 'SETUP' && <SetupTab thang={thang} />}
+          {visitedTabs.SUMMARY && (
+            <div className={activeTab === 'SUMMARY' ? '' : 'hidden'}>
+              <SummaryTab thang={thang} catalog={catalog} onReloadCatalog={loadCatalog} refreshToken={billsChangedToken} />
+            </div>
+          )}
+          {visitedTabs.BILLS && (
+            <div className={activeTab === 'BILLS' ? '' : 'hidden'}>
+              <DailyBillsTab thang={thang} catalog={catalog} onBillsChanged={notifyBillsChanged} />
+            </div>
+          )}
+          {visitedTabs.SETUP && (
+            <div className={activeTab === 'SETUP' ? '' : 'hidden'}>
+              <SetupTab thang={thang} />
+            </div>
+          )}
         </>
       )}
     </div>
