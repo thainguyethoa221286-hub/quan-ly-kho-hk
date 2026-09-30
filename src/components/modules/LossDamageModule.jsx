@@ -2,12 +2,13 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { AlertTriangle, Plus, Download, Printer, Loader2, X, Trash2 } from 'lucide-react';
 import * as XLSX from 'xlsx-js-style';
 import { useStore } from '../../context/StoreContext';
+// ⚠️ BẢN THỬ NGHIỆM (nhánh supabase-pilot): đọc/ghi qua Supabase.
 import {
   getDamageItemsCatalog,
   getDamageData,
   saveDamageItem,
   deleteDamageItem,
-} from '../../services/googleSheetsService';
+} from '../../services/supabaseDamageService';
 
 const GROUPS = ['Amenities', 'CCDC', 'Linen', 'Minibar', 'Setup', 'Hút thuốc', 'Khác'];
 const fmtNumber = (v) => (Number(v) || 0).toLocaleString('vi-VN');
