@@ -461,7 +461,7 @@ export default function LossDamageModule() {
       </div>
 
       {/* ---- Table ---- */}
-      <div className="max-h-[calc(100vh-340px)] overflow-y-auto overflow-x-auto rounded border border-[#141414] bg-white">
+      <div className="max-h-[calc(100vh-340px)] overflow-y-auto overflow-x-auto rounded border border-[#141414] bg-white print:max-h-none print:overflow-visible">
         <table className="w-full border-collapse text-xs">
           <thead className="bg-slate-700 text-xs font-bold uppercase tracking-wide text-white">
             <tr>
