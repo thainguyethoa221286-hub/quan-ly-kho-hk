@@ -19,13 +19,22 @@
 
 /* Technical Data Grid Custom Scrollbar & Printing */
 @media print {
-  body * {
+  html, body {
+    background: #fff !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+  /* Nếu trang có phần tử đánh dấu .print-container (báo cáo dạng modal),
+     chỉ hiện phần đó; các trang in trực tiếp (không có .print-container)
+     sẽ in nguyên nội dung hiện tại của module, các khối print:hidden tự ẩn. */
+  body:has(.print-container) * {
     visibility: hidden;
   }
-  .print-container, .print-container * {
+  body:has(.print-container) .print-container,
+  body:has(.print-container) .print-container * {
     visibility: visible;
   }
-  .print-container {
+  body:has(.print-container) .print-container {
     position: absolute;
     left: 0;
     top: 0;
