@@ -522,18 +522,20 @@ export default function StoreModule() {
       </div>
 
       {/* ---- Table ---- */}
-      <div className="max-h-[calc(100vh-160px)] overflow-y-auto overflow-x-auto rounded border border-[#141414] bg-white">
+      <div className="max-h-[calc(100vh-160px)] overflow-y-auto overflow-x-auto rounded border border-[#141414] bg-white print:max-h-none print:overflow-visible">
         <table className="w-full border-collapse text-xs">
           <thead className="bg-slate-700 text-xs font-bold uppercase tracking-wide text-white">
             <tr>
               {[
-                'STT', 'Tên mặt hàng', 'ĐVT', 'Đầu kỳ', 'Set up', 'Nhập', 'Transfer',
-                'Hư hỏng/mất', 'Sử dụng', 'Tổng xuất', 'Tồn/Cuối kỳ', 'Tổng Kho', 'Ghi chú',
+                'STT', 'Tên mặt hàng', 'ĐVT', 'Đầu kỳ', 'Set up', 'Nhập', 'Tồn/Cuối kỳ', 'Transfer',
+                'Hư hỏng/mất', 'Sử dụng', 'Tổng xuất', 'Tổng Kho', 'Ghi chú',
                 ...(canEdit && showDeleteColumn ? ['Xoá'] : []),
               ].map((h, i) => (
                 <th
                   key={h + i}
-                  className={`sticky top-0 z-20 border border-white/20 bg-slate-700 px-2 py-2 text-left shadow-[0_1px_0_0_#141414] ${i === 1 ? 'min-w-[280px]' : ''}`}
+                  className={`sticky top-0 z-20 border border-white/20 px-2 py-2 text-left shadow-[0_1px_0_0_#141414] ${i === 1 ? 'min-w-[280px]' : ''} ${
+                    i === 6 ? 'bg-yellow-200 text-[#141414]' : 'bg-slate-700'
+                  }`}
                 >
                   {h}
                 </th>
@@ -585,6 +587,22 @@ export default function StoreModule() {
                       className="w-16 bg-transparent px-2 py-1 text-right focus:bg-yellow-300 focus:outline-none focus:ring-2 focus:ring-yellow-500 disabled:cursor-not-allowed disabled:opacity-60"
                     />
                   </td>
+
+                  {/* Editable: Ton (nhập tay, kiểm kê thực tế) — đặt ngay sau cột Nhập, nền vàng nhạt */}
+                  <td className="border border-[#141414]/30 bg-yellow-100 p-0">
+                    <input
+                      type="number"
+                      data-field="Ton"
+                      value={it.Ton || ''}
+                      onChange={(e) => handleFieldChange(it.rowIndex, 'Ton', e.target.value)}
+                      onFocus={() => setFocusedRow(it.rowIndex)}
+                      onKeyDown={(e) => handleGridKeyDown(e, 'Ton')}
+                      onBlur={() => { handleFieldBlur(it.rowIndex); setFocusedRow(null); }}
+                      disabled={!canEdit}
+                      className="w-16 bg-transparent px-2 py-1 text-right font-semibold text-red-600 focus:bg-yellow-300 focus:outline-none focus:ring-2 focus:ring-yellow-500 disabled:cursor-not-allowed disabled:opacity-60"
+                    />
+                  </td>
+
                   <td className="border border-[#141414]/30 p-0">
                     <input
                       type="number"
@@ -613,21 +631,6 @@ export default function StoreModule() {
                   </td>
 
                   <td className="border border-[#141414]/30 px-2 py-1 text-right font-semibold">{fmtNumber(it.TongXuat)}</td>
-
-                  {/* Editable: Ton (nhập tay, kiểm kê thực tế) */}
-                  <td className="border border-[#141414]/30 p-0 bg-red-50/40">
-                    <input
-                      type="number"
-                      data-field="Ton"
-                      value={it.Ton || ''}
-                      onChange={(e) => handleFieldChange(it.rowIndex, 'Ton', e.target.value)}
-                      onFocus={() => setFocusedRow(it.rowIndex)}
-                      onKeyDown={(e) => handleGridKeyDown(e, 'Ton')}
-                      onBlur={() => { handleFieldBlur(it.rowIndex); setFocusedRow(null); }}
-                      disabled={!canEdit}
-                      className="w-16 bg-transparent px-2 py-1 text-right font-semibold text-red-600 focus:bg-yellow-300 focus:outline-none focus:ring-2 focus:ring-yellow-500 disabled:cursor-not-allowed disabled:opacity-60"
-                    />
-                  </td>
 
                   <td className="border border-[#141414]/30 px-2 py-1 text-right font-semibold">{fmtNumber(it.TongKho)}</td>
 
@@ -668,11 +671,11 @@ export default function StoreModule() {
               <tr>
                 <td colSpan={5} className="border border-[#141414]/30 px-2 py-2">TỔNG CỘNG</td>
                 <td className="border border-[#141414]/30 px-2 py-2 text-right">{fmtNumber(totals.Nhap)}</td>
+                <td className="border border-[#141414]/30 bg-yellow-100 px-2 py-2 text-right">{fmtNumber(totals.Ton)}</td>
                 <td className="border border-[#141414]/30 px-2 py-2 text-right">{fmtNumber(totals.Transfer)}</td>
                 <td className="border border-[#141414]/30 px-2 py-2 text-right">{fmtNumber(totals.HuHongMat)}</td>
                 <td className="border border-[#141414]/30 px-2 py-2 text-right">{fmtNumber(totals.SuDung)}</td>
                 <td className="border border-[#141414]/30 px-2 py-2 text-right">{fmtNumber(totals.TongXuat)}</td>
-                <td className="border border-[#141414]/30 px-2 py-2 text-right">{fmtNumber(totals.Ton)}</td>
                 <td className="border border-[#141414]/30 px-2 py-2 text-right">{fmtNumber(totals.TongKho)}</td>
                 <td className="border border-[#141414]/30 px-2 py-2" colSpan={2} />
               </tr>
