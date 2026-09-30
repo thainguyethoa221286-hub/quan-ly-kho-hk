@@ -91,7 +91,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   ];
 
   return (
-    <aside className={`bg-[#F2F1EE] border-r border-[#141414] transition-all duration-300 flex flex-col justify-between shrink-0 ${isCollapsed ? 'w-16' : 'w-72'}`}>
+    <aside className={`bg-[#F2F1EE] border-r border-[#141414] transition-all duration-300 flex flex-col justify-between shrink-0 print:hidden ${isCollapsed ? 'w-16' : 'w-72'}`}>
       
       {/* Top Header inside Sidebar */}
       <div>
