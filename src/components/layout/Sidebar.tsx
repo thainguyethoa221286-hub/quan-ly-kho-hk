@@ -4,7 +4,8 @@ import {
   BarChart3, ChevronLeft, ChevronRight
 } from 'lucide-react';
 import { useStore } from '../../context/StoreContext';
-import { getMinibarSummary } from '../../services/googleSheetsService';
+// ⚠️ BẢN THỬ NGHIỆM (nhánh supabase-pilot): đọc/ghi qua Supabase.
+import { getMinibarSummary } from '../../services/supabaseMinibarService';
 
 export type ActiveModule = 'MODULE_01_STORE' | 'MODULE_02_PRPO' | 'MODULE_03_DAMAGE' | 'MODULE_04_MINIBAR' | 'MODULE_05_VPP' | 'MODULE_06_DASHBOARD';
 
