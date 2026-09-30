@@ -6,7 +6,6 @@ import {
   getKhoData,
   saveKhoItem,
   deleteKhoItem,
-  rolloverMonth,
 } from '../../services/googleSheetsService';
 
 // ---------- Helpers ----------
@@ -174,8 +173,6 @@ export default function StoreModule() {
   const [showAddRow, setShowAddRow] = useState(false);
   const [showDeleteColumn, setShowDeleteColumn] = useState(false);
   const [confirmDeleteItem, setConfirmDeleteItem] = useState(null);
-  const [rolloverBusy, setRolloverBusy] = useState(false);
-  const [confirmRollover, setConfirmRollover] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
   const [focusedRow, setFocusedRow] = useState(null);
 
@@ -284,21 +281,6 @@ export default function StoreModule() {
       setShowAddRow(false);
     } catch (err) {
       setError('Lỗi khi thêm mới: ' + err.message);
-    }
-  };
-
-  const handleRollover = async () => {
-    setRolloverBusy(true);
-    setError(null);
-    try {
-      const toThang = nextMonthStr(thang);
-      await rolloverMonth(thang, toThang);
-      setConfirmRollover(false);
-      setThang(toThang);
-    } catch (err) {
-      setError('Lỗi khi kết chuyển tháng: ' + err.message);
-    } finally {
-      setRolloverBusy(false);
     }
   };
 
@@ -496,14 +478,6 @@ export default function StoreModule() {
             >
               {showDeleteColumn ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
               {showDeleteColumn ? 'Đang hiện cột Xoá' : 'Hiện cột Xoá'}
-            </button>
-          )}
-          {canEdit && (
-            <button
-              onClick={() => setConfirmRollover(true)}
-              className="flex items-center gap-1 rounded bg-[#10B981] px-3 py-1.5 text-xs font-bold text-white hover:bg-emerald-700"
-            >
-              <RefreshCw className="h-3.5 w-3.5" /> Kết chuyển sang tháng sau
             </button>
           )}
         </div>
@@ -706,45 +680,6 @@ export default function StoreModule() {
           onCancel={() => setShowExportModal(false)}
           onConfirm={runExportExcel}
         />
-      )}
-
-      {confirmRollover && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 print:hidden">
-          <div className="w-96 rounded-lg bg-white p-5 shadow-xl">
-            <h3 className="mb-2 text-base font-bold">Xác nhận kết chuyển tháng</h3>
-            <p className="mb-4 text-sm text-slate-600">
-              Toàn bộ <strong>Tồn</strong> (số bạn đã nhập tay) của tháng <strong>{thang}</strong> sẽ trở
-              thành <strong>Đầu kỳ</strong> của tháng <strong>{nextMonthStr(thang)}</strong>. Các ô Nhập,
-              Transfer, Hư hỏng/mất, Sử dụng, Tồn của tháng mới sẽ để <strong>trống</strong> (không phải
-              số 0) để bạn nhập liệu nhanh hơn. <strong>Ghi chú</strong> sẽ được giữ nguyên từ tháng cũ.
-              Thao tác này không thể hoàn tác.
-            </p>
-            {rolloverBusy && (
-              <p className="mb-3 flex items-center gap-2 rounded bg-amber-50 px-3 py-2 text-xs font-medium text-amber-700">
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                Đang kết chuyển dữ liệu sang Google Sheets, vui lòng đợi trong giây lát... (có thể mất
-                tới 30-60 giây nếu danh sách nhiều mặt hàng)
-              </p>
-            )}
-            <div className="flex justify-end gap-2">
-              <button
-                onClick={() => setConfirmRollover(false)}
-                className="rounded border border-[#141414] px-3 py-1.5 text-sm"
-                disabled={rolloverBusy}
-              >
-                Huỷ
-              </button>
-              <button
-                onClick={handleRollover}
-                disabled={rolloverBusy}
-                className="flex items-center gap-1 rounded bg-[#10B981] px-3 py-1.5 text-sm font-bold text-white disabled:opacity-50"
-              >
-                {rolloverBusy && <Loader2 className="h-4 w-4 animate-spin" />}
-                Xác nhận kết chuyển
-              </button>
-            </div>
-          </div>
-        </div>
       )}
 
       {confirmDeleteItem && (
