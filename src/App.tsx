@@ -9,8 +9,9 @@ import MinibarModule from './components/modules/MinibarModule';
 import OfficeSuppliesModule from './components/modules/OfficeSuppliesModule';
 import DashboardModule from './components/modules/DashboardModule';
 import { Calendar, CheckCircle2 } from 'lucide-react';
+import { getMonthOptions, formatMonthLabel } from './utils/monthOptions';
 
-const MONTH_OPTIONS = ['2026-05', '2026-06', '2026-07', '2026-08', '2026-09'];
+const MONTH_OPTIONS = getMonthOptions();
 
 // ---------- Màn hình bắt buộc chọn tháng khi mở App ----------
 function StartupMonthModal() {
@@ -41,10 +42,9 @@ function StartupMonthModal() {
           onChange={(e) => setDraft(e.target.value)}
           className="mb-5 w-full rounded border border-[#141414] bg-white px-3 py-2.5 text-sm font-bold focus:outline-none"
         >
-          {MONTH_OPTIONS.map((m) => {
-            const [y, mm] = m.split('-');
-            return <option key={m} value={m}>Tháng {mm}/{y}</option>;
-          })}
+          {MONTH_OPTIONS.map((m) => (
+            <option key={m} value={m}>{formatMonthLabel(m)}</option>
+          ))}
         </select>
 
         <button
