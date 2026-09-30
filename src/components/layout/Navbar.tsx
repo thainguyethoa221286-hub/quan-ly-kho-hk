@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
 import { useStore } from '../../context/StoreContext';
-import { exportMonthlyMasterWorkbookToExcel } from '../../utils/excelExporter';
-import { 
-  Building2, Calendar, Lock, Unlock, Download, RefreshCw, UserCheck, ShieldCheck, Eye, KeyRound, X, LogOut
+import {
+  Building2, Calendar, Lock, Unlock, RefreshCw, UserCheck, ShieldCheck, Eye, KeyRound, X, LogOut
 } from 'lucide-react';
 
 // ---------- Modal nhập mật khẩu để mở Chế Độ Quản Lý ----------
@@ -50,22 +49,10 @@ export const Navbar: React.FC = () => {
     userProfile, setUserRole, 
     toggleLockMonth, isMonthLocked,
     isManagerMode, unlockManager, lockManagerSession, canEdit,
-    storeItems, prItems, damageRecords, minibarItems, roomSetups, vppItems, resetToDefaults
+    resetToDefaults
   } = useStore();
 
   const [showPasswordModal, setShowPasswordModal] = useState(false);
-
-  const handleExportAll = () => {
-    exportMonthlyMasterWorkbookToExcel(
-      selectedMonth,
-      storeItems,
-      prItems,
-      damageRecords,
-      minibarItems,
-      roomSetups,
-      vppItems
-    );
-  };
 
   const handleConfirmPassword = (password: string) => {
     const ok = unlockManager(password);
@@ -74,7 +61,7 @@ export const Navbar: React.FC = () => {
   };
 
   return (
-    <header className="bg-[#F2F1EE] border-b border-[#141414] text-[#141414] sticky top-0 z-40 shadow-sm">
+    <header className="bg-[#F2F1EE] border-b border-[#141414] text-[#141414] sticky top-0 z-40 shadow-sm print:hidden">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
         
         {/* Left Branding */}
@@ -201,16 +188,6 @@ export const Navbar: React.FC = () => {
               </button>
             </div>
           </div>
-
-          {/* Export Master Excel */}
-          <button
-            onClick={handleExportAll}
-            className="flex items-center gap-1.5 bg-[#141414] hover:bg-slate-800 text-white px-3.5 py-1.5 font-mono font-bold text-xs uppercase border border-[#141414] transition-all cursor-pointer"
-            title="Xuất file Excel tổng hợp gồm tất cả 5 sheet báo cáo"
-          >
-            <Download className="w-4 h-4" />
-            <span className="hidden lg:inline">Master Excel</span>
-          </button>
 
           {/* Reset Mock Data - chỉ Quản lý mới thấy được */}
           {isManagerMode && (
