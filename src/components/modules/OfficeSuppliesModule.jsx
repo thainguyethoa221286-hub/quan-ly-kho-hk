@@ -231,12 +231,12 @@ export default function OfficeSuppliesModule() {
         </div>
       )}
 
-      <div className="max-h-[calc(100vh-160px)] overflow-y-auto overflow-x-auto rounded border border-[#141414] bg-white">
+      <div className="max-h-[calc(100vh-160px)] overflow-y-auto overflow-x-auto rounded border border-[#141414] bg-white print:max-h-none print:overflow-visible">
         <table className="w-full border-collapse text-xs">
           <thead className="bg-slate-700 text-xs font-bold uppercase tracking-wide text-white">
             <tr>
               {['STT', 'TÊN VĂN PHÒNG PHẨM', 'ĐVT', 'TỒN ĐẦU', 'NHẬP', 'TỒN CUỐI KỲ', 'XUẤT SỬ DỤNG', 'GHI CHÚ', ''].map((h, i) => (
-                <th key={h + i} className={`sticky top-0 z-20 border border-white/20 bg-slate-700 px-2 py-2 text-left shadow-[0_1px_0_0_#141414] ${i === 1 ? 'min-w-[240px]' : ''}`}>{h}</th>
+                <th key={h + i} className={`sticky top-0 z-20 border border-white/20 px-2 py-2 text-left shadow-[0_1px_0_0_#141414] ${i === 1 ? 'min-w-[240px]' : ''} ${i === 5 ? 'bg-yellow-200 text-[#141414]' : 'bg-slate-700'}`}>{h}</th>
               ))}
             </tr>
           </thead>
@@ -269,7 +269,7 @@ export default function OfficeSuppliesModule() {
                       onBlur={() => persistRow(it.rowIndex)}
                       placeholder="0" className="w-16 bg-transparent px-2 py-1 text-right focus:bg-yellow-300 focus:outline-none" />
                   </td>
-                  <td className="border-2 border-[#141414] bg-yellow-50 p-0">
+                  <td className="border-2 border-[#141414] bg-yellow-100 p-0">
                     <input type="number" data-field="CuoiKy" value={it.CuoiKy === 0 ? '' : it.CuoiKy}
                       onChange={(e) => handleFieldChange(it.rowIndex, 'CuoiKy', e.target.value)}
                       onKeyDown={(e) => gridKeyNav(e, 'CuoiKy')}
