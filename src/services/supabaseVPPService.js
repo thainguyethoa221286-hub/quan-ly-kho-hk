@@ -4,6 +4,7 @@
  * ============================================================
  */
 import { supabase } from './supabaseClient';
+import { num } from './supabaseShared';
 
 const TABLE = 'vpp_items';
 
@@ -26,8 +27,8 @@ export async function getVPPData(thang) {
 
 export async function saveVPPItem(thang, item) {
   const row = {
-    stt: item.Stt, ten_hang: item.TenHang, dvt: item.DVT,
-    dau_ky: item.DauKy, nhap: item.Nhap, cuoi_ky: item.CuoiKy, ghi_chu: item.GhiChu,
+    stt: num(item.Stt), ten_hang: item.TenHang, dvt: item.DVT,
+    dau_ky: num(item.DauKy), nhap: num(item.Nhap), cuoi_ky: num(item.CuoiKy), ghi_chu: item.GhiChu,
   };
   if (item.rowIndex) {
     const { error } = await supabase.from(TABLE).update(row).eq('id', item.rowIndex);
