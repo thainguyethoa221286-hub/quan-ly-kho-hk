@@ -4,6 +4,16 @@
  * Supabase tính ra cùng kết quả khi so sánh song song.
  */
 
+// Chuyển mọi giá trị input (kể cả '', null, undefined, hoặc chuỗi không phải
+// số) thành số 0 trước khi gửi lên cột `numeric` của Postgres — tránh lỗi
+// "invalid input syntax for type numeric" khi người dùng xoá trắng ô rồi bấm
+// ra ngoài (onBlur) trước khi gõ số mới.
+export function num(v) {
+  if (v === '' || v === null || v === undefined) return 0;
+  const n = Number(v);
+  return isNaN(n) ? 0 : n;
+}
+
 /** Trả về chuỗi tháng liền trước, VD "2026-09" -> "2026-08" */
 export function prevMonthStr(thang) {
   const [y, m] = thang.split('-').map(Number);
