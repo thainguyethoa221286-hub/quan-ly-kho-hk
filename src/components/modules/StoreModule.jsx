@@ -27,7 +27,7 @@ function parseVN(v) {
 // server trả về) bị coi là falsy nên ô tự động hiện TRỐNG dù đã lưu đúng —
 // làm người dùng tưởng chưa lưu được, gõ lại số 0 nhiều lần, dồn request.
 function inputVal(v) {
-  return v === null || v === undefined || v === '' || v === 0 ? '' : v;
+  return v === null || v === undefined || v === '' || Number(v) === 0 ? '' : v;
 }
 
 function computeDerived(item) {
