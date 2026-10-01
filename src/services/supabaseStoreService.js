@@ -10,6 +10,22 @@
  */
 import { supabase } from './supabaseClient';
 
+// Chuyển mọi giá trị input (kể cả '', null, undefined, hoặc chuỗi không phải
+// số) thành số 0 trước khi gửi lên cột `numeric` của Postgres — tránh lỗi
+// "invalid input syntax for type numeric" khi người dùng xoá trắng ô rồi bấm
+// ra ngoài (onBlur) trước khi gõ số mới.
+function num(v) {
+  if (v === '' || v === null || v === undefined) return 0;
+  const n = Number(v);
+  return isNaN(n) ? 0 : n;
+}
+
+// Các field nào là số (phải sanitize qua num()) trước khi ghi vào Supabase.
+const NUMERIC_FIELDS = new Set([
+  'Stt', 'DauKy', 'SetUp', 'Nhap', 'Transfer', 'HuHongMat',
+  'SuDung', 'TongXuat', 'Ton', 'TongKho', 'Cost', 'ThanhTien',
+]);
+
 const TABLE = 'store_items';
 
 // Cột trong Supabase (snake_case) <-> field trong app (PascalCase, khớp
@@ -44,7 +60,9 @@ function rowToItem(row) {
 function itemToRow(item) {
   const row = {};
   Object.entries(FIELD_MAP).forEach(([appField, col]) => {
-    if (item[appField] !== undefined) row[col] = item[appField];
+    if (item[appField] !== undefined) {
+      row[col] = NUMERIC_FIELDS.has(appField) ? num(item[appField]) : item[appField];
+    }
   });
   return row;
 }
