@@ -5,7 +5,7 @@
  */
 import { supabase } from './supabaseClient';
 import { getKhoData, saveKhoItem } from './supabaseStoreService';
-import { normalizeName } from './supabaseShared';
+import { normalizeName, num } from './supabaseShared';
 
 const CATALOG_TABLE = 'damage_catalog';
 const RECORDS_TABLE = 'damage_records';
@@ -87,9 +87,9 @@ async function adjustStoreHuHongMat(thang, tenHang, nhom, deltaSL) {
 export async function saveDamageItem(thang, item) {
   if (item.rowIndex) {
     const row = {
-      stt: item.Stt, ngay: item.Ngay, ten_hang: item.TenHang, nhom: item.Nhom,
-      vi_tri: item.ViTri, sl: item.SL, hinh_thuc: item.HinhThuc,
-      thu_khach: item.ThuKhach, foc_cost: item.FOCCost,
+      stt: num(item.Stt), ngay: item.Ngay, ten_hang: item.TenHang, nhom: item.Nhom,
+      vi_tri: item.ViTri, sl: num(item.SL), hinh_thuc: item.HinhThuc,
+      thu_khach: item.ThuKhach, foc_cost: num(item.FOCCost),
       nguoi_bao_cao: item.NguoiBaoCao, ghi_chu: item.GhiChu,
     };
     const { error } = await supabase.from(RECORDS_TABLE).update(row).eq('id', item.rowIndex);
@@ -97,11 +97,11 @@ export async function saveDamageItem(thang, item) {
     return { rowIndex: item.rowIndex };
   }
 
-  const synced = await adjustStoreHuHongMat(thang, item.TenHang, item.Nhom, Number(item.SL) || 0);
+  const synced = await adjustStoreHuHongMat(thang, item.TenHang, item.Nhom, num(item.SL));
   const row = {
-    thang, stt: item.Stt, ngay: item.Ngay, ten_hang: item.TenHang, nhom: item.Nhom,
-    vi_tri: item.ViTri, sl: item.SL, hinh_thuc: item.HinhThuc,
-    thu_khach: item.ThuKhach, foc_cost: item.FOCCost,
+    thang, stt: num(item.Stt), ngay: item.Ngay, ten_hang: item.TenHang, nhom: item.Nhom,
+    vi_tri: item.ViTri, sl: num(item.SL), hinh_thuc: item.HinhThuc,
+    thu_khach: item.ThuKhach, foc_cost: num(item.FOCCost),
     nguoi_bao_cao: item.NguoiBaoCao, ghi_chu: item.GhiChu, synced,
   };
   const { data, error } = await supabase.from(RECORDS_TABLE).insert(row).select().single();
