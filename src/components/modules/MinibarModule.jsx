@@ -520,7 +520,7 @@ function SummaryTab({ thang, catalog, onReloadCatalog, refreshToken }) {
                     <td className="border border-[#141414]/30 px-2 py-1">{it.DVT}</td>
                     <td className="border border-[#141414]/30 px-2 py-1 text-right">{fmtNumber(it.TonDau)}</td>
                     <td className="border border-amber-400 bg-amber-50 p-0">
-                      <input type="number" data-field="Nhap" value={it.Nhap === 0 ? '' : it.Nhap}
+                      <input type="number" data-field="Nhap" value={Number(it.Nhap) === 0 ? '' : it.Nhap}
                         onChange={(e) => handleFieldChange(it.rowIndex, 'Nhap', e.target.value)}
                         onKeyDown={(e) => gridKeyNav(e, 'Nhap')}
                         onBlur={() => persistRow(it.rowIndex)}
@@ -528,7 +528,7 @@ function SummaryTab({ thang, catalog, onReloadCatalog, refreshToken }) {
                         className="w-16 bg-transparent px-2 py-1 text-right focus:bg-yellow-300 focus:outline-none" />
                     </td>
                     <td className="border-2 border-[#141414] bg-yellow-100 p-0">
-                      <input type="number" data-field="TonKho" value={it.TonKho === 0 ? '' : it.TonKho}
+                      <input type="number" data-field="TonKho" value={Number(it.TonKho) === 0 ? '' : it.TonKho}
                         onChange={(e) => handleFieldChange(it.rowIndex, 'TonKho', e.target.value)}
                         onKeyDown={(e) => gridKeyNav(e, 'TonKho')}
                         onBlur={() => persistRow(it.rowIndex)}
@@ -904,7 +904,7 @@ function SetupTab({ thang }) {
                   <td className="sticky left-0 z-10 min-w-[180px] border border-slate-200 bg-white px-2 py-1 font-medium">{r.TenHang}</td>
                   {FLOORS.map((f) => (
                     <td key={f} className="border border-slate-200 p-0">
-                      <input type="number" data-field={`floor-${f}`} value={r[f] === 0 ? '' : r[f]}
+                      <input type="number" data-field={`floor-${f}`} value={Number(r[f]) === 0 ? '' : r[f]}
                         onChange={(e) => handleMatrixChange(r.rowIndex, f, e.target.value)}
                         onKeyDown={(e) => gridKeyNav(e, `floor-${f}`)}
                         onBlur={() => persistMatrixRow(r.rowIndex)}
@@ -945,7 +945,7 @@ function SetupTab({ thang }) {
                   <td className="min-w-[180px] border border-slate-200 px-2 py-1 font-medium">{r.TenHang}</td>
                   {['FBTonDau', 'FBTonCuoi'].map((f) => (
                     <td key={f} className="border border-slate-200 p-0">
-                      <input type="number" data-field={f} value={r[f] === 0 || r[f] === '' || r[f] == null ? '' : r[f]}
+                      <input type="number" data-field={f} value={r[f] === '' || r[f] == null || Number(r[f]) === 0 ? '' : r[f]}
                         onChange={(e) => handleFbfoChange(r.rowIndex, f, e.target.value)}
                         onKeyDown={(e) => gridKeyNav(e, f)}
                         onBlur={() => persistFbfoRow(r.rowIndex)}
@@ -955,7 +955,7 @@ function SetupTab({ thang }) {
                   <td className="border border-slate-200 px-2 py-1 text-center text-base font-bold text-red-600">{r.FBTransfer ? fmtNumber(r.FBTransfer) : ''}</td>
                   {['FOTonDau', 'FOTonCuoi'].map((f) => (
                     <td key={f} className="border border-slate-200 p-0">
-                      <input type="number" data-field={f} value={r[f] === 0 || r[f] === '' || r[f] == null ? '' : r[f]}
+                      <input type="number" data-field={f} value={r[f] === '' || r[f] == null || Number(r[f]) === 0 ? '' : r[f]}
                         onChange={(e) => handleFbfoChange(r.rowIndex, f, e.target.value)}
                         onKeyDown={(e) => gridKeyNav(e, f)}
                         onBlur={() => persistFbfoRow(r.rowIndex)}
