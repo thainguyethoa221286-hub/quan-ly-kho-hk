@@ -8,6 +8,16 @@ import { supabase } from './supabaseClient';
 import { getDamageData } from './supabaseDamageService';
 import { normalizeName, dedupeByName, prevMonthStr } from './supabaseShared';
 
+// Chuyển mọi giá trị input (kể cả '', null, undefined, hoặc chuỗi không phải
+// số) thành số 0 trước khi gửi lên cột `numeric` của Postgres — tránh lỗi
+// "invalid input syntax for type numeric" khi người dùng xoá trắng ô rồi bấm
+// ra ngoài (onBlur) trước khi gõ số mới.
+function num(v) {
+  if (v === '' || v === null || v === undefined) return 0;
+  const n = Number(v);
+  return isNaN(n) ? 0 : n;
+}
+
 const FLOORS = ['F1', 'F2', 'F3', 'F4', 'F5', 'F6', 'F7', 'F8', 'F9'];
 const CATALOG_TABLE = 'minibar_catalog';
 const SETUP_TABLE = 'minibar_setup';
@@ -27,7 +37,7 @@ export async function getMinibarCatalog() {
 }
 
 export async function saveMinibarCatalogItem(item) {
-  const row = { ten_hang: item.TenHang, dvt: item.DVT, don_gia: item.DonGia };
+  const row = { ten_hang: item.TenHang, dvt: item.DVT, don_gia: num(item.DonGia) };
   if (item.rowIndex) {
     const { error } = await supabase.from(CATALOG_TABLE).update(row).eq('id', item.rowIndex);
     if (error) throw new Error(error.message);
@@ -76,7 +86,7 @@ export async function getMinibarSetup() {
 
 export async function saveMinibarSetupItem(item) {
   const row = {};
-  FLOORS.forEach((f) => { row[f.toLowerCase()] = item[f]; });
+  FLOORS.forEach((f) => { row[f.toLowerCase()] = num(item[f]); });
   const { error } = await supabase.from(SETUP_TABLE).update(row).eq('id', item.rowIndex);
   if (error) throw new Error(error.message);
   return { rowIndex: item.rowIndex };
@@ -125,8 +135,8 @@ export async function getMinibarFBFO(thang) {
 
 export async function saveMinibarFBFOItem(thang, item) {
   const row = {
-    fb_ton_dau: item.FBTonDau, fb_ton_cuoi: item.FBTonCuoi,
-    fo_ton_dau: item.FOTonDau, fo_ton_cuoi: item.FOTonCuoi, ghi_chu: item.GhiChu,
+    fb_ton_dau: num(item.FBTonDau), fb_ton_cuoi: num(item.FBTonCuoi),
+    fo_ton_dau: num(item.FOTonDau), fo_ton_cuoi: num(item.FOTonCuoi), ghi_chu: item.GhiChu,
   };
   const { error } = await supabase.from(FBFO_TABLE).update(row).eq('id', item.rowIndex);
   if (error) throw new Error(error.message);
@@ -168,7 +178,7 @@ export async function saveMinibarBill(thang, bill) {
 
   const newRows = bill.items.map((it, idx) => ({
     thang, stt: idx + 1, bill_id: billId, ngay: bill.ngay, phong: bill.phong, tang: bill.tang,
-    ten_hang: it.tenHang, dvt: it.dvt, don_gia: it.donGia, sl_bill: it.slBill, sl_foc: it.slFOC,
+    ten_hang: it.tenHang, dvt: it.dvt, don_gia: num(it.donGia), sl_bill: num(it.slBill), sl_foc: num(it.slFOC),
     nguoi_bao_cao: bill.nguoiBaoCao, ghi_chu: bill.ghiChu || '',
   }));
   const { error } = await supabase.from(BILLS_TABLE).insert(newRows);
@@ -294,7 +304,7 @@ export async function getMinibarSummary(thang) {
 }
 
 export async function saveMinibarSummaryItem(thang, item) {
-  const row = { ton_dau: item.TonDau, nhap: item.Nhap, ton_kho: item.TonKho, ghi_chu: item.GhiChu };
+  const row = { ton_dau: num(item.TonDau), nhap: num(item.Nhap), ton_kho: num(item.TonKho), ghi_chu: item.GhiChu };
   const { error } = await supabase.from(SUMMARY_TABLE).update(row).eq('id', item.rowIndex);
   if (error) throw new Error(error.message);
   return { rowIndex: item.rowIndex };
