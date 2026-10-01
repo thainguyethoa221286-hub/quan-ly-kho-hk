@@ -6,7 +6,7 @@
  */
 import { supabase } from './supabaseClient';
 import { getKhoData, saveKhoItem } from './supabaseStoreService';
-import { prevMonthStr } from './supabaseShared';
+import { prevMonthStr, num } from './supabaseShared';
 
 const TABLE = 'prpo_items';
 
@@ -82,10 +82,10 @@ export async function getPRPOData(thang) {
 export async function savePRPOItem(thang, item) {
   const row = {
     thang,
-    stt: item.Stt,
+    stt: num(item.Stt),
     ten_hang: item.TenHang,
     dvt: item.DVT,
-    stock_max: item.StockMax,
+    stock_max: num(item.StockMax),
     ghi_chu: item.GhiChu || '',
     hidden: item.Hidden === true || item.Hidden === 'true',
   };
