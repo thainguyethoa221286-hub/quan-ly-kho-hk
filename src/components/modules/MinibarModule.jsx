@@ -359,6 +359,10 @@ function SummaryTab({ thang, catalog, onReloadCatalog, refreshToken }) {
         rowIndex: item.rowIndex, Stt: item.Stt, TenHang: item.TenHang, DVT: item.DVT,
         TonDau: item.TonDau, Nhap: item.Nhap, TonKho: item.TonKho, GhiChu: item.GhiChu,
       });
+      // Nạp lại ngầm (không hiện spinner toàn màn hình) để các cột tính toán
+      // (Tồn Trên Báo Cáo, Tồn Thực Tế, Chênh Lệch...) cập nhật ngay, không
+      // cần người dùng bấm nút reset thủ công.
+      await load(true);
     } catch (err) {
       setError('Lỗi khi lưu: ' + err.message);
     } finally {
