@@ -239,21 +239,21 @@ export default function OfficeSuppliesModule() {
                   <td className="border border-[#141414]/30 px-2 py-1">{it.DVT}</td>
 
                   <td className="border border-[#141414]/30 p-0">
-                    <input type="number" data-field="DauKy" value={it.DauKy === 0 ? '' : it.DauKy}
+                    <input type="number" data-field="DauKy" value={Number(it.DauKy) === 0 ? '' : it.DauKy}
                       onChange={(e) => handleFieldChange(it.rowIndex, 'DauKy', e.target.value)}
                       onKeyDown={(e) => gridKeyNav(e, 'DauKy')}
                       onBlur={() => persistRow(it.rowIndex)}
                       placeholder="0" className="w-16 bg-transparent px-2 py-1 text-right focus:bg-yellow-300 focus:outline-none" />
                   </td>
                   <td className="border border-[#141414]/30 p-0">
-                    <input type="number" data-field="Nhap" value={it.Nhap === 0 ? '' : it.Nhap}
+                    <input type="number" data-field="Nhap" value={Number(it.Nhap) === 0 ? '' : it.Nhap}
                       onChange={(e) => handleFieldChange(it.rowIndex, 'Nhap', e.target.value)}
                       onKeyDown={(e) => gridKeyNav(e, 'Nhap')}
                       onBlur={() => persistRow(it.rowIndex)}
                       placeholder="0" className="w-16 bg-transparent px-2 py-1 text-right focus:bg-yellow-300 focus:outline-none" />
                   </td>
                   <td className="border-2 border-[#141414] bg-yellow-100 p-0">
-                    <input type="number" data-field="CuoiKy" value={it.CuoiKy === 0 ? '' : it.CuoiKy}
+                    <input type="number" data-field="CuoiKy" value={Number(it.CuoiKy) === 0 ? '' : it.CuoiKy}
                       onChange={(e) => handleFieldChange(it.rowIndex, 'CuoiKy', e.target.value)}
                       onKeyDown={(e) => gridKeyNav(e, 'CuoiKy')}
                       onBlur={() => persistRow(it.rowIndex)}
