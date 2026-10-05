@@ -20,6 +20,10 @@ import { buildDailyBillsMatrix, appendMinibarDailySheet } from '../../services/m
 const FLOORS = ['F1', 'F2', 'F3', 'F4', 'F5', 'F6', 'F7', 'F8', 'F9'];
 // Thuế VAT áp cho Tổng Tiền hiển thị trên mỗi Bill ở Lịch Sử Daily Bills (+8%).
 const VAT_RATE = 0.08;
+// Phụ phí phục vụ 5% — cộng thêm cùng VAT 8% vào Thành Tiền từng Item hiển thị
+// trong Lịch Sử Daily Bills (tổng cộng +13%), theo yêu cầu áp luôn 2 khoản này
+// trên giá tiền hiển thị, không còn hiện riêng Tổng Tiền (đã bỏ badge xanh lá).
+const SERVICE_CHARGE_RATE = 0.05;
 const fmtNumber = (v) => (Number(v) || 0).toLocaleString('vi-VN');
 const parseAmount = (str) => {
   if (str === null || str === undefined || str === '') return 0;
@@ -967,24 +971,22 @@ function DailyBillsTab({ thang, catalog, onBillsChanged, refreshToken }) {
                   </div>
                   <div className="space-y-2 bg-slate-50/60 px-0.5 py-2">
                     {billsOfDay.map((b) => {
-                      const totalNoTax = b.items.reduce((s, it) => s + (Number(it.SLBill) || 0) * (Number(it.DonGia) || 0), 0);
-                      const totalWithTax = totalNoTax * (1 + VAT_RATE);
+                      const seq = seqLabel(b.billId, b.phong, b.ngay);
                       return (
                         <div key={b.billId} className="rounded border border-[#141414] bg-white p-3">
                           <div className="mb-1.5 flex items-center justify-between border-b border-slate-100 pb-1.5">
                             <span className="rounded border border-blue-300 bg-blue-100 px-2 py-0.5 text-xs font-semibold text-blue-800">
-                              Phòng {b.phong} ({seqLabel(b.billId, b.phong, b.ngay)})
+                              Phòng {b.phong}{seq > 1 ? ` (${seq})` : ''}
                             </span>
                             <div className="flex items-center gap-1.5">
-                              <span className="text-xs font-bold text-emerald-600">{fmtNumber(totalWithTax)} đ</span>
                               <button onClick={() => handleEditBill(b)} className="text-slate-400 hover:text-[#141414]"><Edit2 className="h-3.5 w-3.5" /></button>
                               <button onClick={() => handleDeleteBill(b.billId)} className="text-red-400 hover:text-red-600"><Trash2 className="h-3.5 w-3.5" /></button>
                             </div>
                           </div>
-                          {/* Chi tiết từng Item — 3 cột riêng: Tên Item | Số lượng | Thành tiền (chưa thuế) */}
+                          {/* Chi tiết từng Item — 3 cột riêng: Tên Item | Số lượng | Thành tiền (ĐÃ gồm VAT 8% + Phụ phí phục vụ 5%) */}
                           <div className="space-y-1 text-xs">
                             {b.items.map((it, idx) => {
-                              const lineTotal = (Number(it.SLBill) || 0) * (Number(it.DonGia) || 0);
+                              const lineTotal = (Number(it.SLBill) || 0) * (Number(it.DonGia) || 0) * (1 + VAT_RATE + SERVICE_CHARGE_RATE);
                               return (
                                 <div key={idx} className="grid grid-cols-[1fr_auto_auto] items-center gap-2">
                                   <span className="truncate text-sm font-semibold text-slate-800">
