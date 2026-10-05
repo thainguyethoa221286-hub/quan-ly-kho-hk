@@ -24,6 +24,7 @@ const SETUP_TABLE = 'minibar_setup';
 const FBFO_TABLE = 'minibar_fbfo';
 const BILLS_TABLE = 'minibar_bills';
 const SUMMARY_TABLE = 'minibar_summary';
+const NOPOST_TABLE = 'minibar_nopost_bills';
 
 // ========== 1. Danh mục Item Minibar ==========
 function catalogRowToItem(row) {
@@ -193,6 +194,53 @@ export async function deleteMinibarBill(thang, billId) {
   const { error } = await supabase.from(BILLS_TABLE).delete().eq('bill_id', billId).eq('thang', thang);
   if (error) throw new Error(error.message);
   return { deleted: true, count: data.length };
+}
+
+// ========== 4B. Bill NO POST (tiêu dùng thực tế nhưng chưa post được lên PMS) ==========
+// ⚠️ Bảng RIÊNG với minibar_bills — Item nằm ở đây CHƯA được tính là đã "Billed"
+// (không cộng vào Bảng Báo Cáo Tổng/Billed cho tới khi người dùng bấm "Post Bill"
+// thật sự tại màn "Danh Sách Bill No Post", lúc đó dữ liệu mới được chuyển hẳn
+// sang minibar_bills và dòng No Post tương ứng bị xoá).
+function noPostRowToItem(row) {
+  return {
+    rowIndex: row.id, Stt: row.stt, BillId: row.bill_id, Ngay: row.ngay, Phong: row.phong,
+    Tang: row.tang, TenHang: row.ten_hang, DVT: row.dvt, DonGia: row.don_gia,
+    SLNoPost: row.sl_nopost, NguoiBaoCao: row.nguoi_bao_cao, GhiChu: row.ghi_chu,
+  };
+}
+
+export async function getMinibarNoPostBills(thang) {
+  const { data, error } = await supabase.from(NOPOST_TABLE).select('*').eq('thang', thang).order('id');
+  if (error) throw new Error(error.message);
+  return data.map(noPostRowToItem);
+}
+
+function getNextNoPostBillSeq(existingRows, phong, ngay) {
+  const billIds = new Set(existingRows.filter((r) => r.Phong === phong && r.Ngay === ngay).map((r) => r.BillId));
+  return billIds.size + 1;
+}
+
+/** Lưu 1 Bill NO POST mới (nhiều dòng Item, mỗi dòng 1 Item có SL No Post > 0). */
+export async function saveMinibarNoPostBill(thang, bill) {
+  const rows = await getMinibarNoPostBills(thang);
+  const seq = getNextNoPostBillSeq(rows, bill.phong, bill.ngay);
+  const billId = `NP_${bill.phong}_${bill.ngay}_${seq}`;
+
+  const newRows = bill.items.map((it, idx) => ({
+    thang, stt: idx + 1, bill_id: billId, ngay: bill.ngay, phong: bill.phong, tang: bill.tang,
+    ten_hang: it.tenHang, dvt: it.dvt, don_gia: num(it.donGia), sl_nopost: num(it.slNoPost),
+    nguoi_bao_cao: bill.nguoiBaoCao, ghi_chu: bill.ghiChu || '',
+  }));
+  const { error } = await supabase.from(NOPOST_TABLE).insert(newRows);
+  if (error) throw new Error(error.message);
+  return { billId, rowsWritten: newRows.length };
+}
+
+/** Xoá 1 Bill NO POST — dùng khi đã Post Bill thật sự (chuyển sang minibar_bills) hoặc khi người dùng muốn bỏ. */
+export async function deleteMinibarNoPostBill(thang, billId) {
+  const { error } = await supabase.from(NOPOST_TABLE).delete().eq('bill_id', billId).eq('thang', thang);
+  if (error) throw new Error(error.message);
+  return { deleted: true };
 }
 
 // ========== 5. Bảng Báo Cáo Tổng ==========
