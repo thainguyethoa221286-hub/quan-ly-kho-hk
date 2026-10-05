@@ -4,6 +4,7 @@ import {
   Building2, Calendar, Lock, Unlock, RefreshCw, UserCheck, ShieldCheck, Eye, KeyRound, X, LogOut
 } from 'lucide-react';
 import { getMonthOptions, formatMonthLabel } from '../../utils/monthOptions';
+import { useConfirm } from '../common/useConfirm';
 
 // ---------- Modal nhập mật khẩu để mở Chế Độ Quản Lý ----------
 function ManagerPasswordModal({ onCancel, onConfirm }) {
@@ -45,9 +46,10 @@ function ManagerPasswordModal({ onCancel, onConfirm }) {
 }
 
 export const Navbar: React.FC = () => {
-  const { 
-    selectedMonth, setSelectedMonth, 
-    userProfile, setUserRole, 
+  const { confirm, ConfirmDialog } = useConfirm();
+  const {
+    selectedMonth, setSelectedMonth,
+    userProfile, setUserRole,
     toggleLockMonth, isMonthLocked,
     isManagerMode, unlockManager, lockManagerSession, canEdit,
     resetToDefaults
@@ -62,6 +64,7 @@ export const Navbar: React.FC = () => {
   };
 
   return (
+    <>
     <header className="bg-[#F2F1EE] border-b border-[#141414] text-[#141414] sticky top-0 z-40 shadow-sm print:hidden">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
         
@@ -191,8 +194,8 @@ export const Navbar: React.FC = () => {
           {/* Reset Mock Data - chỉ Quản lý mới thấy được */}
           {isManagerMode && (
             <button
-              onClick={() => {
-                if (window.confirm('Bạn có chắc chắn muốn khôi phục dữ liệu mẫu ban đầu?')) {
+              onClick={async () => {
+                if (await confirm('Bạn có chắc chắn muốn khôi phục dữ liệu mẫu ban đầu?')) {
                   resetToDefaults();
                 }
               }}
@@ -214,5 +217,7 @@ export const Navbar: React.FC = () => {
         />
       )}
     </header>
+    {ConfirmDialog}
+    </>
   );
 };
