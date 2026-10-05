@@ -9,8 +9,9 @@ import { useStore } from '../../context/StoreContext';
 import { getKhoData, rolloverMonth } from '../../services/supabaseStoreService';
 import { getPRPOData } from '../../services/supabasePRPOService';
 import { getDamageData } from '../../services/supabaseDamageService';
-import { getMinibarSummary, rolloverMinibarMonth } from '../../services/supabaseMinibarService';
+import { getMinibarSummary, rolloverMinibarMonth, getMinibarBills, getMinibarCatalog } from '../../services/supabaseMinibarService';
 import { getVPPData, rolloverVPPMonth } from '../../services/supabaseVPPService';
+import { appendMinibarDailySheet } from '../../services/minibarDailyMatrixSheet';
 
 const fmtNumber = (v) => (Number(v) || 0).toLocaleString('vi-VN');
 
@@ -207,13 +208,22 @@ async function exportReportExcel(report, thang) {
   XLSX.writeFile(wb, `${report.title.replace(/\s+/g, '_')}_${thang}.xlsx`);
 }
 
-// ---------- Master Workbook Excel: gộp cả 5 phân hệ vào 1 file nhiều sheet ----------
+// ---------- Xuất Báo Cáo Tổng Của Tháng: gộp các phân hệ vào 1 file nhiều sheet ----------
+// ⚠️ Theo yêu cầu: KHÔNG gồm "Đề Xuất Mua Hàng PR-PO" (report.key === 'PRPO') trong
+// file gộp này — PR-PO vẫn còn trong REPORTS để dùng cho Xem Nhanh/Excel/In A4 riêng lẻ
+// ở "Report List", chỉ bị loại khỏi export tổng hợp này mà thôi.
+// Thêm 1 sheet "Minibar Daily" (ma trận Ngày x Phòng x Item, giống hệt nút "Xuất Báo Cáo
+// Daily Bills (Excel)" trong Module Minibar) ngay sau sheet Minibar (tổng hợp tháng).
+const MASTER_WORKBOOK_EXCLUDED_KEYS = ['PRPO'];
+
 async function exportMasterWorkbook(thang) {
   const wb = XLSX.utils.book_new();
   const grey = 'D9D9D9';
   const thin = { top: { style: 'thin', color: { rgb: 'CCCCCC' } }, bottom: { style: 'thin', color: { rgb: 'CCCCCC' } }, left: { style: 'thin', color: { rgb: 'CCCCCC' } }, right: { style: 'thin', color: { rgb: 'CCCCCC' } } };
 
   for (const report of REPORTS) {
+    if (MASTER_WORKBOOK_EXCLUDED_KEYS.includes(report.key)) continue;
+
     const rows = await report.fetch(thang);
     const headers = report.columns.map((c) => c.label);
     const aoa = [[`M HOTEL — ${report.title.toUpperCase()} — THÁNG ${thang}`], [], headers];
@@ -231,9 +241,19 @@ async function exportMasterWorkbook(thang) {
     for (let c = 0; c <= lastCol; c++) setStyle(2, c, { font: { bold: true, sz: 9, name: 'Times New Roman' }, fill: { fgColor: { rgb: grey } }, alignment: { horizontal: 'center', wrapText: true }, border: thin });
     for (let r = 3; r < aoa.length; r++) for (let c = 0; c <= lastCol; c++) setStyle(r, c, { font: { sz: 9, name: 'Times New Roman' }, alignment: { horizontal: report.columns[c].num ? 'right' : 'left' }, border: thin });
     XLSX.utils.book_append_sheet(wb, ws, report.key);
+
+    // Ngay sau sheet "MINIBAR" (tổng hợp tháng) -> chèn thêm sheet "MINIBAR_DAILY"
+    // (ma trận Ngày x Phòng x Item từ Lịch Sử Daily Bills), vì user yêu cầu gộp CẢ 2
+    // báo cáo Minibar vào chung file Báo Cáo Tổng Của Tháng.
+    if (report.key === 'MINIBAR') {
+      const [bills, catalog] = await Promise.all([getMinibarBills(thang), getMinibarCatalog()]);
+      if (bills.length > 0) {
+        appendMinibarDailySheet(wb, { bills, catalog, thang, sheetName: 'MINIBAR_DAILY' });
+      }
+    }
   }
 
-  XLSX.writeFile(wb, `Master_Workbook_HK_${thang}.xlsx`);
+  XLSX.writeFile(wb, `Bao_Cao_Tong_Hop_Thang_${thang}.xlsx`);
 }
 
 // ---------- Main Component ----------
@@ -339,7 +359,7 @@ export default function DashboardModule() {
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <button onClick={handleMasterExport} disabled={masterExporting} className="flex items-center gap-1 rounded bg-[#141414] px-3 py-1.5 text-xs font-bold text-white hover:bg-slate-800 disabled:opacity-50">
-            {masterExporting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />} Master Workbook Excel
+            {masterExporting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />} Xuất Báo Cáo Tổng Của Tháng
           </button>
           <button onClick={() => toggleLockMonth(thang)} className={`flex items-center gap-1 rounded px-3 py-1.5 text-xs font-bold text-white ${isMonthLocked ? 'bg-red-500 hover:bg-red-600' : 'bg-[#10B981] hover:bg-emerald-700'}`}>
             {isMonthLocked ? <Lock className="h-3.5 w-3.5" /> : <Unlock className="h-3.5 w-3.5" />}
