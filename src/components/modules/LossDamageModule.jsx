@@ -9,6 +9,7 @@ import {
   saveDamageItem,
   deleteDamageItem,
 } from '../../services/supabaseDamageService';
+import { useConfirm } from '../common/useConfirm';
 
 const GROUPS = ['Amenities', 'CCDC', 'Linen', 'Minibar', 'Setup', 'Hút thuốc', 'Khác'];
 const fmtNumber = (v) => (Number(v) || 0).toLocaleString('vi-VN');
@@ -207,6 +208,7 @@ function AddDamageModal({ catalog, onCancel, onConfirm }) {
 }
 
 export default function LossDamageModule() {
+  const { confirm, ConfirmDialog } = useConfirm();
   const { selectedMonth } = useStore();
   const thang = selectedMonth;
 
@@ -291,7 +293,7 @@ export default function LossDamageModule() {
   };
 
   const handleDelete = async (rowIndex) => {
-    if (!window.confirm('Xoá dòng báo cáo này? Nếu đã đồng bộ sang Module 01, số lượng hư hỏng sẽ được trừ ngược lại.')) return;
+    if (!(await confirm('Xoá dòng báo cáo này? Nếu đã đồng bộ sang Module 01, số lượng hư hỏng sẽ được trừ ngược lại.'))) return;
     try {
       await deleteDamageItem(thang, rowIndex);
       setItems((prev) => prev.filter((it) => it.rowIndex !== rowIndex));
@@ -559,6 +561,7 @@ export default function LossDamageModule() {
           onConfirm={handleAdd}
         />
       )}
+      {ConfirmDialog}
     </div>
   );
 }
