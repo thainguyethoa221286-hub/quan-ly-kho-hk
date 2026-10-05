@@ -970,7 +970,7 @@ function DailyBillsTab({ thang, catalog, onBillsChanged, refreshToken }) {
               billsByDate.map(({ ngay, bills: billsOfDay }) => (
                 <div key={ngay}>
                   {/* Header nhóm Ngày — tách rõ từng Ngày để dễ tra soát khi list nhiều Bill */}
-                  <div className="sticky top-0 z-[5] rounded border border-lime-300 bg-lime-100 px-3 py-1 text-[11px] font-bold text-lime-900">
+                  <div className="sticky top-0 z-[5] rounded border border-yellow-300 bg-yellow-100 px-3 py-1 text-[11px] font-bold text-yellow-900">
                     {fmtDateDisplay(ngay)}
                   </div>
                   <div className="space-y-2 bg-slate-50/60 px-0.5 py-2">
