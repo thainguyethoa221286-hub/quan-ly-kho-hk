@@ -18,12 +18,16 @@ import {
 import { buildDailyBillsMatrix, appendMinibarDailySheet } from '../../services/minibarDailyMatrixSheet';
 
 const FLOORS = ['F1', 'F2', 'F3', 'F4', 'F5', 'F6', 'F7', 'F8', 'F9'];
-// Thuế VAT áp cho Tổng Tiền hiển thị trên mỗi Bill ở Lịch Sử Daily Bills (+8%).
+// Thuế VAT 8% + Phụ phí phục vụ 5% áp vào Tổng Tiền (badge xanh lá) mỗi Bill ở
+// Lịch Sử Daily Bills — tính CỘNG DỒN TUẦN TỰ giống hệt cách PMS/ezFolio tính
+// (Phí phục vụ 5% trước, rồi VAT 8% tính trên cả gốc + phí phục vụ), KHÔNG phải
+// cộng thẳng 13% một lần. VD gốc 120,000: x1.05 = 126,000 (đã +SC) -> x1.08 =
+// 136,080 (đã +VAT) = Tổng Tiền cuối cùng. Xem applyVatAndServiceCharge() dưới.
 const VAT_RATE = 0.08;
-// Phụ phí phục vụ 5% — cộng thêm cùng VAT 8% vào Thành Tiền từng Item hiển thị
-// trong Lịch Sử Daily Bills (tổng cộng +13%), theo yêu cầu áp luôn 2 khoản này
-// trên giá tiền hiển thị, không còn hiện riêng Tổng Tiền (đã bỏ badge xanh lá).
 const SERVICE_CHARGE_RATE = 0.05;
+function applyVatAndServiceCharge(amount) {
+  return amount * (1 + SERVICE_CHARGE_RATE) * (1 + VAT_RATE);
+}
 const fmtNumber = (v) => (Number(v) || 0).toLocaleString('vi-VN');
 const parseAmount = (str) => {
   if (str === null || str === undefined || str === '') return 0;
@@ -966,7 +970,7 @@ function DailyBillsTab({ thang, catalog, onBillsChanged, refreshToken }) {
               billsByDate.map(({ ngay, bills: billsOfDay }) => (
                 <div key={ngay}>
                   {/* Header nhóm Ngày — tách rõ từng Ngày để dễ tra soát khi list nhiều Bill */}
-                  <div className="sticky top-0 z-[5] rounded bg-slate-200 px-3 py-1 text-[11px] font-bold text-slate-800">
+                  <div className="sticky top-0 z-[5] rounded border border-lime-300 bg-lime-100 px-3 py-1 text-[11px] font-bold text-lime-900">
                     {fmtDateDisplay(ngay)}
                   </div>
                   <div className="space-y-2 bg-slate-50/60 px-0.5 py-2">
@@ -975,7 +979,7 @@ function DailyBillsTab({ thang, catalog, onBillsChanged, refreshToken }) {
                       // Tổng Tiền Bill (badge xanh lá) = Tổng (SLBill x Đơn Giá) các Item,
                       // ĐÃ gồm Thuế VAT 8% + Phụ phí phục vụ 5% (tổng +13%).
                       const totalNoTax = b.items.reduce((s, it) => s + (Number(it.SLBill) || 0) * (Number(it.DonGia) || 0), 0);
-                      const totalWithTax = totalNoTax * (1 + VAT_RATE + SERVICE_CHARGE_RATE);
+                      const totalWithTax = applyVatAndServiceCharge(totalNoTax);
                       return (
                         <div key={b.billId} className="rounded border border-[#141414] bg-white p-3">
                           <div className="mb-1.5 flex items-center justify-between border-b border-slate-100 pb-1.5">
