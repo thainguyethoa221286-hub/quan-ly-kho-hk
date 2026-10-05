@@ -16,6 +16,7 @@ import {
   getMinibarSummary, saveMinibarSummaryItem,
 } from '../../services/supabaseMinibarService';
 import { buildDailyBillsMatrix, appendMinibarDailySheet } from '../../services/minibarDailyMatrixSheet';
+import { useConfirm } from '../common/useConfirm';
 
 const FLOORS = ['F1', 'F2', 'F3', 'F4', 'F5', 'F6', 'F7', 'F8', 'F9'];
 // Thuế VAT 8% + Phụ phí phục vụ 5% áp vào Tổng Tiền (badge xanh lá) mỗi Bill ở
@@ -407,7 +408,7 @@ function PMSReconciliationModal({ rows, onClose }) {
   );
 }
 
-function SummaryTab({ thang, catalog, onReloadCatalog, refreshToken }) {
+function SummaryTab({ thang, catalog, onReloadCatalog, refreshToken, isActive }) {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -444,6 +445,21 @@ function SummaryTab({ thang, catalog, onReloadCatalog, refreshToken }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { if (refreshToken) load(true); }, [refreshToken]);
   useEffect(() => { setPmsRecords(null); setPmsFileName(''); }, [thang]);
+
+  // ⚠️ App.tsx KHÔNG unmount các Module khi chuyển tab (chỉ ẩn bằng class
+  // "hidden") để chuyển tab mượt, không phải tải lại từ đầu. Nhưng vì vậy, nếu
+  // người dùng đứng ở Module Minibar rồi qua Module Hư Hỏng/FOC post 1 dòng
+  // "No Charge" cho Minibar, Bảng Báo Cáo Tổng bên Minibar (đang ẩn, vẫn giữ
+  // state cũ) sẽ KHÔNG tự cập nhật cột NO CHARGE khi quay lại — phải F5 cả
+  // trang mới thấy số mới. Nạp lại NGẦM (không chớp màn hình) mỗi khi tab
+  // Minibar chuyển từ ẩn -> hiện để luôn thấy số liệu mới nhất.
+  const isFirstActive = React.useRef(true);
+  useEffect(() => {
+    if (!isActive) return;
+    if (isFirstActive.current) { isFirstActive.current = false; return; }
+    load(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isActive]);
 
   const pmsDiscrepancies = useMemo(() => {
     if (!pmsRecords) return [];
@@ -694,6 +710,7 @@ function SummaryTab({ thang, catalog, onReloadCatalog, refreshToken }) {
 // SUB 4A: Ghi Nhận Daily Bills
 // ==================================================================
 function DailyBillsTab({ thang, catalog, onBillsChanged, refreshToken }) {
+  const { confirm, ConfirmDialog } = useConfirm();
   const [bills, setBills] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -841,7 +858,7 @@ function DailyBillsTab({ thang, catalog, onBillsChanged, refreshToken }) {
   };
 
   const handleDeleteBill = async (billId) => {
-    if (!window.confirm('Xoá toàn bộ Bill này?')) return;
+    if (!(await confirm('Xoá toàn bộ Bill này?'))) return;
     try {
       await deleteMinibarBill(thang, billId);
       setBills((prev) => prev.filter((r) => r.BillId !== billId));
@@ -1025,6 +1042,7 @@ function DailyBillsTab({ thang, catalog, onBillsChanged, refreshToken }) {
           onExport={handleExportDailyBillsMatrix}
         />
       )}
+      {ConfirmDialog}
     </div>
   );
 }
@@ -1033,6 +1051,7 @@ function DailyBillsTab({ thang, catalog, onBillsChanged, refreshToken }) {
 // SUB 4C: Danh Sách Bill NO POST — tiêu dùng thực tế nhưng chưa post lên PMS
 // ==================================================================
 function NoPostBillsTab({ thang, onPosted }) {
+  const { confirm, ConfirmDialog } = useConfirm();
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -1082,7 +1101,7 @@ function NoPostBillsTab({ thang, onPosted }) {
   };
 
   const handleDiscard = async (billId) => {
-    if (!window.confirm('Xoá bỏ Bill No Post này? (Không post lên PMS)')) return;
+    if (!(await confirm('Xoá bỏ Bill No Post này? (Không post lên PMS)'))) return;
     try {
       await deleteMinibarNoPostBill(thang, billId);
       setRows((prev) => prev.filter((r) => r.BillId !== billId));
@@ -1148,6 +1167,7 @@ function NoPostBillsTab({ thang, onPosted }) {
           })}
         </div>
       )}
+      {ConfirmDialog}
     </div>
   );
 }
@@ -1339,7 +1359,7 @@ function SetupTab({ thang }) {
 // ==================================================================
 // MAIN: MinibarModule
 // ==================================================================
-export default function MinibarModule() {
+export default function MinibarModule({ isActive }) {
   const { selectedMonth } = useStore();
   const thang = selectedMonth;
   const [activeTab, setActiveTab] = useState('SUMMARY');
@@ -1436,7 +1456,7 @@ export default function MinibarModule() {
         <>
           {visitedTabs.SUMMARY && (
             <div className={activeTab === 'SUMMARY' ? '' : 'hidden'}>
-              <SummaryTab thang={thang} catalog={catalog} onReloadCatalog={loadCatalog} refreshToken={billsChangedToken} />
+              <SummaryTab thang={thang} catalog={catalog} onReloadCatalog={loadCatalog} refreshToken={billsChangedToken} isActive={isActive} />
             </div>
           )}
           {visitedTabs.BILLS && (
