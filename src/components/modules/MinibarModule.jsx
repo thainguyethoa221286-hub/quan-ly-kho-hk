@@ -16,6 +16,8 @@ import {
 } from '../../services/supabaseMinibarService';
 
 const FLOORS = ['F1', 'F2', 'F3', 'F4', 'F5', 'F6', 'F7', 'F8', 'F9'];
+// Thuế VAT áp cho Tổng Tiền hiển thị trên mỗi Bill ở Lịch Sử Daily Bills (+8%).
+const VAT_RATE = 0.08;
 const fmtNumber = (v) => (Number(v) || 0).toLocaleString('vi-VN');
 const parseAmount = (str) => {
   if (str === null || str === undefined || str === '') return 0;
@@ -341,9 +343,8 @@ function SummaryTab({ thang, catalog, onReloadCatalog, refreshToken }) {
   };
 
   const totals = useMemo(() => {
-    const setupTotal = items.reduce((s, it) => s + (Number(it.SetupRoom) || 0), 0);
     const urgentCount = items.filter((it) => Number(it.ChenhLech) !== 0).length;
-    return { setupTotal, urgentCount };
+    return { urgentCount };
   }, [items]);
 
   const handleFieldChange = (rowIndex, field, value) => {
@@ -453,7 +454,7 @@ function SummaryTab({ thang, catalog, onReloadCatalog, refreshToken }) {
         </div>
       )}
 
-      <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 print:hidden">
+      <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2 print:hidden">
         <button onClick={() => setShowDiscrepancy(true)} className="flex items-center justify-between rounded-xl border border-slate-200 bg-red-50 p-4 text-left shadow-md transition-shadow duration-200 hover:shadow-lg">
           <div>
             <p className="text-xs font-mono uppercase text-slate-500">Chênh Lệch Kiểm Kê</p>
@@ -485,12 +486,6 @@ function SummaryTab({ thang, catalog, onReloadCatalog, refreshToken }) {
             <ChevronDown className="h-5 w-5 -rotate-90 text-slate-400" />
           </button>
         )}
-
-        <div className="rounded-xl border border-slate-200 bg-blue-50 p-4 shadow-md transition-shadow duration-200 hover:shadow-lg">
-          <p className="text-xs font-mono uppercase text-slate-500">Tồn Khay Setup Phòng</p>
-          <p className="mt-1 text-2xl font-bold text-[#141414]">{fmtNumber(totals.setupTotal)} <span className="text-sm font-normal text-slate-400">mục</span></p>
-          <p className="text-[11px] text-slate-400">Lấy tự động từ Sub 4B + FB Tồn Đầu</p>
-        </div>
       </div>
 
       <div className="max-h-[calc(100vh-260px)] overflow-y-auto overflow-x-auto rounded border border-[#141414] bg-white print:max-h-none print:overflow-visible">
@@ -584,6 +579,13 @@ function DailyBillsTab({ thang, catalog, onBillsChanged }) {
   const [posting, setPosting] = useState(false);
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
+  // Ô ngày chỉ CẬP NHẬT giá trị đang gõ (draft) — bộ lọc thật sự (fromDate/toDate,
+  // cái điều khiển groupedBills) chỉ áp dụng khi bấm nút "Tìm" (hoặc Enter), để
+  // tránh tự tra soát khi mới chọn xong 1 trong 2 ô ngày.
+  const [fromDraft, setFromDraft] = useState('');
+  const [toDraft, setToDraft] = useState('');
+  const applyDateFilter = () => { setFromDate(fromDraft); setToDate(toDraft); };
+  const clearDateFilter = () => { setFromDraft(''); setToDraft(''); setFromDate(''); setToDate(''); };
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -611,6 +613,19 @@ function DailyBillsTab({ thang, catalog, onBillsChanged }) {
     if (toDate) list = list.filter((b) => b.ngay <= toDate);
     return list;
   }, [bills, fromDate, toDate]);
+
+  // Gom các Bill theo từng Ngày để hiện 1 header riêng cho mỗi nhóm Ngày
+  // trong Lịch Sử Daily Bills (dễ tra soát hơn khi list nhiều Bill liền nhau).
+  const billsByDate = useMemo(() => {
+    const map = {};
+    groupedBills.forEach((b) => {
+      if (!map[b.ngay]) map[b.ngay] = [];
+      map[b.ngay].push(b);
+    });
+    return Object.keys(map)
+      .sort((a, b) => (b || '').localeCompare(a || ''))
+      .map((ngay) => ({ ngay, bills: map[ngay] }));
+  }, [groupedBills]);
 
   const seqLabel = (billId, phongVal, ngayVal) => {
     const sameRoomDayIds = [...new Set(bills.filter((r) => r.Phong === phongVal && r.Ngay === ngayVal).map((r) => r.BillId))];
@@ -745,49 +760,72 @@ function DailyBillsTab({ thang, catalog, onBillsChanged }) {
         {/* ---- Right: History ---- */}
         <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-md">
           <h3 className="mb-3 text-sm font-bold uppercase text-[#141414]">Lịch Sử Daily Bills</h3>
-          <div className="mb-3 flex items-center gap-2 text-xs">
+          <div className="mb-3 flex flex-wrap items-center gap-2 text-xs">
             <span className="text-slate-500">Từ ngày</span>
-            <input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} className="rounded border border-slate-300 px-2 py-1" />
+            <input type="date" value={fromDraft} onChange={(e) => setFromDraft(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && applyDateFilter()}
+              className="rounded border border-slate-300 px-2 py-1" />
             <span className="text-slate-500">Đến ngày</span>
-            <input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} className="rounded border border-slate-300 px-2 py-1" />
-            {(fromDate || toDate) && <button onClick={() => { setFromDate(''); setToDate(''); }} className="text-slate-400 underline">Xoá lọc</button>}
+            <input type="date" value={toDraft} onChange={(e) => setToDraft(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && applyDateFilter()}
+              className="rounded border border-slate-300 px-2 py-1" />
+            <button onClick={applyDateFilter} className="flex items-center gap-1 rounded bg-[#141414] px-2.5 py-1 font-bold text-white hover:bg-slate-800">
+              <Search className="h-3 w-3" /> Tìm
+            </button>
+            {(fromDate || toDate) && <button onClick={clearDateFilter} className="text-slate-400 underline">Xoá lọc</button>}
           </div>
 
-          <div className="max-h-[460px] space-y-2 overflow-y-auto">
+          <div className="max-h-[460px] space-y-3 overflow-y-auto">
             {loading ? (
               <div className="py-8 text-center text-slate-400"><Loader2 className="mx-auto h-5 w-5 animate-spin" /></div>
             ) : groupedBills.length === 0 ? (
               <p className="py-8 text-center text-sm text-slate-400">Chưa có Bill nào.</p>
             ) : (
-              groupedBills.map((b) => {
-                const total = b.items.reduce((s, it) => s + (Number(it.SLBill) || 0) * (Number(it.DonGia) || 0), 0);
-                return (
-                  <div key={b.billId} className="rounded border border-[#141414] bg-white p-3">
-                    <div className="mb-1.5 flex items-center justify-between border-b border-slate-100 pb-1.5">
-                      <div className="flex items-center gap-2">
-                        <span className="rounded bg-[#141414] px-2 py-0.5 text-xs font-bold text-white">
-                          Phòng {b.phong} ({seqLabel(b.billId, b.phong, b.ngay)})
-                        </span>
-                        <span className="text-xs text-slate-500">{fmtDateDisplay(b.ngay)}</span>
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-xs font-bold text-emerald-600">{fmtNumber(total)} đ</span>
-                        <button onClick={() => handleEditBill(b)} className="text-slate-400 hover:text-[#141414]"><Edit2 className="h-3.5 w-3.5" /></button>
-                        <button onClick={() => handleDeleteBill(b.billId)} className="text-red-400 hover:text-red-600"><Trash2 className="h-3.5 w-3.5" /></button>
-                      </div>
-                    </div>
-                    <div className="space-y-0.5 text-xs">
-                      {b.items.map((it, idx) => (
-                        <div key={idx} className="flex items-center justify-between">
-                          <span>{it.TenHang} {it.SLBill > 0 && `x${it.SLBill}`} {it.SLFOC > 0 && <span className="text-amber-600">(FOC x{it.SLFOC})</span>}</span>
-                          <span className="text-slate-500">{fmtNumber((it.SLBill || 0) * (it.DonGia || 0))} đ</span>
-                        </div>
-                      ))}
-                    </div>
-                    <p className="mt-1 border-t border-slate-100 pt-1 text-[10px] text-slate-400">NV Báo Cáo: {b.nguoiBaoCao || '—'}</p>
+              billsByDate.map(({ ngay, bills: billsOfDay }) => (
+                <div key={ngay}>
+                  {/* Header nhóm Ngày — tách rõ từng Ngày để dễ tra soát khi list nhiều Bill */}
+                  <div className="sticky top-0 z-[5] rounded bg-slate-200 px-3 py-1 text-[11px] font-bold text-slate-800">
+                    {fmtDateDisplay(ngay)}
                   </div>
-                );
-              })
+                  <div className="space-y-2 bg-slate-50/60 px-0.5 py-2">
+                    {billsOfDay.map((b) => {
+                      const totalNoTax = b.items.reduce((s, it) => s + (Number(it.SLBill) || 0) * (Number(it.DonGia) || 0), 0);
+                      const totalWithTax = totalNoTax * (1 + VAT_RATE);
+                      return (
+                        <div key={b.billId} className="rounded border border-[#141414] bg-white p-3">
+                          <div className="mb-1.5 flex items-center justify-between border-b border-slate-100 pb-1.5">
+                            <span className="rounded border border-blue-300 bg-blue-100 px-2 py-0.5 text-xs font-semibold text-blue-800">
+                              Phòng {b.phong} ({seqLabel(b.billId, b.phong, b.ngay)})
+                            </span>
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-xs font-bold text-emerald-600">{fmtNumber(totalWithTax)} đ</span>
+                              <button onClick={() => handleEditBill(b)} className="text-slate-400 hover:text-[#141414]"><Edit2 className="h-3.5 w-3.5" /></button>
+                              <button onClick={() => handleDeleteBill(b.billId)} className="text-red-400 hover:text-red-600"><Trash2 className="h-3.5 w-3.5" /></button>
+                            </div>
+                          </div>
+                          {/* Chi tiết từng Item — 3 cột riêng: Tên Item | Số lượng | Thành tiền (chưa thuế) */}
+                          <div className="space-y-1 text-xs">
+                            {b.items.map((it, idx) => {
+                              const lineTotal = (Number(it.SLBill) || 0) * (Number(it.DonGia) || 0);
+                              return (
+                                <div key={idx} className="grid grid-cols-[1fr_auto_auto] items-center gap-2">
+                                  <span className="truncate">
+                                    {it.TenHang}
+                                    {it.SLFOC > 0 && <span className="ml-1 text-amber-600">(FOC x{it.SLFOC})</span>}
+                                  </span>
+                                  <span className="w-10 text-right text-slate-500">{it.SLBill > 0 ? `x${it.SLBill}` : '—'}</span>
+                                  <span className="w-20 text-right text-slate-500">{fmtNumber(lineTotal)} đ</span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                          <p className="mt-1 border-t border-slate-100 pt-1 text-[10px] text-slate-400">NV Báo Cáo: {b.nguoiBaoCao || '—'}</p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))
             )}
           </div>
         </div>
