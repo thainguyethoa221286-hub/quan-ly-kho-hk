@@ -108,7 +108,9 @@ function AppContent() {
               <div className={activeModule === 'MODULE_03_DAMAGE' ? '' : 'hidden'}><LossDamageModule /></div>
             )}
             {visitedModules.MODULE_04_MINIBAR && (
-              <div className={activeModule === 'MODULE_04_MINIBAR' ? '' : 'hidden'}><MinibarModule /></div>
+              <div className={activeModule === 'MODULE_04_MINIBAR' ? '' : 'hidden'}>
+                <MinibarModule isActive={activeModule === 'MODULE_04_MINIBAR'} />
+              </div>
             )}
             {visitedModules.MODULE_05_VPP && (
               <div className={activeModule === 'MODULE_05_VPP' ? '' : 'hidden'}><OfficeSuppliesModule /></div>
