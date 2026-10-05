@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   Coffee, Download, Printer, Loader2, X, AlertTriangle, Plus, Minus, RefreshCw,
-  Layers, Receipt, ChevronDown, Edit2, Trash2, FileUp, Search, Rocket,
+  Layers, Receipt, ChevronDown, Edit2, Trash2, FileUp, Search, Rocket, Eye,
 } from 'lucide-react';
 import * as XLSX from 'xlsx-js-style';
 import { useStore } from '../../context/StoreContext';
@@ -54,6 +54,126 @@ const gridKeyNav = (e, field) => {
   if ((e.key === 'Enter' || e.key === 'ArrowDown') && idx < inputs.length - 1) inputs[idx + 1].focus();
   else if (e.key === 'ArrowUp' && idx > 0) inputs[idx - 1].focus();
 };
+
+// ==================================================================
+// Gom dữ liệu `bills` (1 tháng) thành Ma Trận Ngày × Phòng × Mặt Hàng —
+// dùng chung cho cả "Xem Nhanh" (xem trong app) và "Xuất Excel".
+// ==================================================================
+function buildDailyBillsMatrix(bills) {
+  const dayMap = {};
+  bills.forEach((b) => {
+    if (!dayMap[b.Ngay]) dayMap[b.Ngay] = new Set();
+    dayMap[b.Ngay].add(b.Phong);
+  });
+  const dayGroups = Object.keys(dayMap)
+    .sort()
+    .map((ngay) => ({
+      ngay,
+      dayNum: Number(ngay.split('-')[2]) || ngay,
+      rooms: [...dayMap[ngay]].sort((a, c) => a.localeCompare(c, undefined, { numeric: true })),
+    }));
+
+  // Ô ma trận (giao Ngày × Phòng × Item) = SLBill + SLFOC cộng dồn — tổng SỐ
+  // LƯỢNG THỰC TẾ đã tiêu dùng, không phân biệt Bill hay FOC trong từng ô.
+  const qtyMap = {};
+  // Tổng BILLED / Tổng FOC riêng của từng Item, cộng dồn cả tháng — dùng cho
+  // 2 cột Total ở cuối bảng.
+  const billMap = {};
+  const focMap = {};
+  // Ngày|Phòng nào có phát sinh FOC (bất kể Item) — để bôi đỏ Số Phòng.
+  const focRoomSet = new Set();
+
+  bills.forEach((b) => {
+    const key = `${b.Ngay}|${b.Phong}|${b.TenHang}`;
+    qtyMap[key] = (qtyMap[key] || 0) + (Number(b.SLBill) || 0) + (Number(b.SLFOC) || 0);
+    billMap[b.TenHang] = (billMap[b.TenHang] || 0) + (Number(b.SLBill) || 0);
+    focMap[b.TenHang] = (focMap[b.TenHang] || 0) + (Number(b.SLFOC) || 0);
+    if (Number(b.SLFOC) > 0) focRoomSet.add(`${b.Ngay}|${b.Phong}`);
+  });
+
+  return { dayGroups, qtyMap, billMap, focMap, focRoomSet };
+}
+
+// ==================================================================
+// Modal: Xem Nhanh Báo Cáo Daily Bills — xem ngay trong App, KHÔNG xuất file.
+// Chỉ dùng khi cần kiểm tra nhanh trước khi quyết định có xuất Excel hay không.
+// ==================================================================
+function DailyBillsMatrixPreviewModal({ bills, catalog, thang, onClose, onExport }) {
+  const { dayGroups, qtyMap, billMap, focMap, focRoomSet } = useMemo(() => buildDailyBillsMatrix(bills), [bills]);
+  const [y, m] = thang.split('-').map(Number);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 print:hidden">
+      <div className="flex max-h-[90vh] w-full max-w-[96vw] flex-col rounded-lg bg-white p-4 shadow-xl">
+        <div className="mb-3 flex items-center justify-between border-b border-slate-200 pb-3">
+          <h3 className="flex items-center gap-2 text-base font-bold text-[#141414]">
+            <Eye className="h-5 w-5" /> Xem Nhanh — BÁO CÁO SỐ LƯỢNG MINIBAR T {String(m).padStart(2, '0')}/{y}
+          </h3>
+          <div className="flex items-center gap-2">
+            <button onClick={onExport} className="flex items-center gap-1 rounded bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-emerald-700">
+              <Download className="h-3.5 w-3.5" /> Xuất Excel
+            </button>
+            <button onClick={onClose}><X className="h-5 w-5 text-slate-400" /></button>
+          </div>
+        </div>
+
+        {bills.length === 0 ? (
+          <p className="py-12 text-center text-sm text-slate-400">Chưa có Bill nào trong tháng để xem.</p>
+        ) : (
+          <>
+            <div className="flex-1 overflow-auto rounded border border-slate-200">
+              <table className="w-full border-collapse text-[11px]">
+                <thead className="sticky top-0 z-20">
+                  <tr className="bg-slate-200 font-bold text-[#141414]">
+                    <th rowSpan={2} className="sticky left-0 z-20 min-w-[36px] border border-slate-300 bg-slate-200 px-1.5 py-1">STT</th>
+                    <th rowSpan={2} className="sticky left-[36px] z-20 min-w-[160px] border border-slate-300 bg-slate-200 px-2 py-1 text-left">TÊN MẶT HÀNG</th>
+                    {dayGroups.map((g) => (
+                      <th key={g.ngay} colSpan={g.rooms.length} className="border border-slate-300 px-1 py-1">{g.dayNum}</th>
+                    ))}
+                    <th colSpan={2} className="border border-slate-300 px-1 py-1">TOTAL</th>
+                    <th rowSpan={2} className="border border-slate-300 px-1.5 py-1">Đơn giá</th>
+                  </tr>
+                  <tr className="bg-slate-200 font-bold text-[#141414]">
+                    {dayGroups.map((g) => g.rooms.map((room) => {
+                      const hasFOC = focRoomSet.has(`${g.ngay}|${room}`);
+                      return (
+                        <th key={`${g.ngay}-${room}`} className={`min-w-[34px] border border-slate-300 px-1 py-1 ${hasFOC ? 'border-b-2 border-b-red-600 text-red-600 underline' : ''}`}>
+                          {room}
+                        </th>
+                      );
+                    }))}
+                    <th className="border border-slate-300 px-1.5 py-1">FOC</th>
+                    <th className="border border-slate-300 px-1.5 py-1">BILLED</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {catalog.map((c, i) => (
+                    <tr key={c.TenHang} className={i % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
+                      <td className="sticky left-0 z-10 border border-slate-200 bg-inherit px-1.5 py-1 text-center">{i + 1}</td>
+                      <td className="sticky left-[36px] z-10 min-w-[160px] border border-slate-200 bg-inherit px-2 py-1 font-semibold">{c.TenHang}</td>
+                      {dayGroups.map((g) => g.rooms.map((room) => {
+                        const qty = qtyMap[`${g.ngay}|${room}|${c.TenHang}`] || 0;
+                        return (
+                          <td key={`${g.ngay}-${room}`} className="border border-slate-200 px-1 py-1 text-center">{qty > 0 ? qty : ''}</td>
+                        );
+                      }))}
+                      <td className="border border-slate-200 px-1.5 py-1 text-right font-semibold text-amber-600">{focMap[c.TenHang] ? fmtNumber(focMap[c.TenHang]) : ''}</td>
+                      <td className="border border-slate-200 px-1.5 py-1 text-right font-semibold text-emerald-600">{billMap[c.TenHang] ? fmtNumber(billMap[c.TenHang]) : ''}</td>
+                      <td className="border border-slate-200 px-1.5 py-1 text-right">{fmtNumber(c.DonGia)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <p className="mt-2 text-[11px] italic text-red-600">
+              Ghi chú: Số Phòng được gạch chân màu đỏ = Ngày đó phòng này có phát sinh hàng FOC (miễn phí) trong số lượng tiêu dùng.
+            </p>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
 
 // ==================================================================
 // Ô số lượng có nút Tăng/Giảm (dùng chung cho BILL / FOC / NO POST)
@@ -618,6 +738,8 @@ function DailyBillsTab({ thang, catalog, onBillsChanged, refreshToken }) {
   const [toDraft, setToDraft] = useState('');
   const applyDateFilter = () => { setFromDate(fromDraft); setToDate(toDraft); };
   const clearDateFilter = () => { setFromDraft(''); setToDraft(''); setFromDate(''); setToDate(''); };
+  // "Xem Nhanh" — chỉ mở xem trong App, KHÔNG xuất file; tách riêng khỏi nút Xuất Excel.
+  const [showMatrixPreview, setShowMatrixPreview] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -752,57 +874,28 @@ function DailyBillsTab({ thang, catalog, onBillsChanged, refreshToken }) {
   // ================================================================
   // Xuất Excel — Ma Trận Ngày × Phòng × Mặt Hàng (đúng mẫu "mini bar.xlsx")
   // ================================================================
-  // ⚠️ Số lượng điền vào ma trận = SLBill + SLFOC cộng dồn (tổng SỐ LƯỢNG THỰC
-  // TẾ ĐÃ TIÊU DÙNG của phòng đó trong ngày đó, gồm cả hàng Bill và hàng FOC
-  // miễn phí) — vì đây là báo cáo "SỐ LƯỢNG" tiêu dùng, không phải báo cáo
-  // doanh thu. Cột "Total" (Tổng Tiền) = Tổng SL (đã gồm FOC) × Đơn giá, nên
-  // sẽ CAO HƠN doanh thu Billed thực tế nếu tháng đó có phát sinh FOC — đúng
-  // như công thức người dùng yêu cầu (Tổng SL × Đơn giá), chỉ lưu ý khi đọc.
+  // ⚠️ Số lượng điền vào TỪNG Ô ma trận = SLBill + SLFOC cộng dồn (tổng SỐ
+  // LƯỢNG THỰC TẾ đã tiêu dùng của phòng đó trong ngày đó). Riêng 2 cột
+  // TOTAL cuối bảng tách RIÊNG: FOC (chỉ SLFOC cộng dồn cả tháng) và BILLED
+  // (chỉ SLBill cộng dồn cả tháng) — không còn cột "Thành Tiền".
   const handleExportDailyBillsMatrix = () => {
     if (bills.length === 0) { setError('Chưa có Bill nào trong tháng để xuất.'); return; }
 
-    // 1) Ngày nào có Bill -> danh sách Số Phòng phát sinh trong ngày đó (duy nhất, sắp theo số)
-    const dayMap = {};
-    bills.forEach((b) => {
-      if (!dayMap[b.Ngay]) dayMap[b.Ngay] = new Set();
-      dayMap[b.Ngay].add(b.Phong);
-    });
-    const dayGroups = Object.keys(dayMap)
-      .sort()
-      .map((ngay) => ({
-        ngay,
-        dayNum: Number(ngay.split('-')[2]) || ngay,
-        rooms: [...dayMap[ngay]].sort((a, c) => a.localeCompare(c, undefined, { numeric: true })),
-      }));
+    const { dayGroups, qtyMap, billMap, focMap, focRoomSet } = buildDailyBillsMatrix(bills);
 
-    // 2) Ma trận SL theo Ngày|Phòng|TênHàng
-    const qtyMap = {};
-    bills.forEach((b) => {
-      const key = `${b.Ngay}|${b.Phong}|${b.TenHang}`;
-      qtyMap[key] = (qtyMap[key] || 0) + (Number(b.SLBill) || 0) + (Number(b.SLFOC) || 0);
-    });
-
-    // Đánh dấu Ngày|Phòng nào có phát sinh FOC (bất kể Item nào) — để bôi ĐỎ
-    // + gạch chân Số Phòng tương ứng ở Dòng 3, giúp phân biệt nhanh phòng nào
-    // trong ngày đó có hàng FOC (miễn phí) lẫn trong số lượng tiêu dùng.
-    const focRoomSet = new Set();
-    bills.forEach((b) => {
-      if (Number(b.SLFOC) > 0) focRoomSet.add(`${b.Ngay}|${b.Phong}`);
-    });
-
-    // 3) Xác định vị trí cột: STT, CODE, TÊN MẶT HÀNG | (từng nhóm Ngày -> từng Phòng) | Total SL | Total Tiền | Ghi chú | Đơn giá
+    // Xác định vị trí cột: STT, CODE, TÊN MẶT HÀNG | (từng nhóm Ngày -> từng Phòng) | TOTAL (FOC | BILLED) | Ghi chú | Đơn giá
     const FIXED_LEFT = 3;
     const dayColStart = [];
     let cursor = FIXED_LEFT;
     dayGroups.forEach((g) => { dayColStart.push(cursor); cursor += g.rooms.length; });
-    const totalSLCol = cursor;
-    const totalTienCol = cursor + 1;
+    const totalFOCCol = cursor;
+    const totalBilledCol = cursor + 1;
     const ghiChuCol = cursor + 2;
     const donGiaCol = cursor + 3;
     const lastCol = donGiaCol;
 
     const HEADER_ROW = 1; // "Dòng 2" (Ngày / tên cột)
-    const SUBHEADER_ROW = 2; // "Dòng 3" (Số Phòng)
+    const SUBHEADER_ROW = 2; // "Dòng 3" (Số Phòng / FOC / BILLED)
     const DATA_START = 3; // "Dòng 4" trở đi
 
     const [y, m] = thang.split('-').map(Number);
@@ -815,8 +908,9 @@ function DailyBillsTab({ thang, catalog, onBillsChanged, refreshToken }) {
     aoa[HEADER_ROW][1] = 'CODE';
     aoa[HEADER_ROW][2] = 'TÊN MẶT HÀNG';
     dayGroups.forEach((g, idx) => { aoa[HEADER_ROW][dayColStart[idx]] = g.dayNum; });
-    aoa[HEADER_ROW][totalSLCol] = 'Total';
-    aoa[HEADER_ROW][totalTienCol] = 'Total';
+    aoa[HEADER_ROW][totalFOCCol] = 'TOTAL';
+    aoa[SUBHEADER_ROW][totalFOCCol] = 'FOC';
+    aoa[SUBHEADER_ROW][totalBilledCol] = 'BILLED';
     aoa[HEADER_ROW][ghiChuCol] = 'Ghi chú';
     aoa[HEADER_ROW][donGiaCol] = 'Đơn giá';
     dayGroups.forEach((g, idx) => {
@@ -828,25 +922,23 @@ function DailyBillsTab({ thang, catalog, onBillsChanged, refreshToken }) {
       aoa[r][0] = i + 1;
       aoa[r][1] = ''; // CODE — App hiện chưa lưu mã sản phẩm riêng cho từng Item Minibar
       aoa[r][2] = c.TenHang;
-      let totalSL = 0;
       dayGroups.forEach((g, idx) => {
         g.rooms.forEach((room, ri) => {
           const qty = qtyMap[`${g.ngay}|${room}|${c.TenHang}`] || 0;
-          if (qty > 0) { aoa[r][dayColStart[idx] + ri] = qty; totalSL += qty; }
+          if (qty > 0) aoa[r][dayColStart[idx] + ri] = qty;
         });
       });
-      const donGia = Number(c.DonGia) || 0;
-      aoa[r][totalSLCol] = totalSL || '';
-      aoa[r][totalTienCol] = totalSL > 0 ? totalSL * donGia : '';
+      aoa[r][totalFOCCol] = focMap[c.TenHang] || '';
+      aoa[r][totalBilledCol] = billMap[c.TenHang] || '';
       aoa[r][ghiChuCol] = '';
-      aoa[r][donGiaCol] = donGia || '';
+      aoa[r][donGiaCol] = Number(c.DonGia) || '';
     });
 
     aoa[LEGEND_ROW][0] = 'Ghi chú: Số Phòng được gạch chân màu ĐỎ = Ngày đó phòng này có phát sinh hàng FOC (miễn phí) trong số lượng tiêu dùng.';
 
     const ws = XLSX.utils.aoa_to_sheet(aoa);
 
-    // Merge: Title | STT/CODE/TÊN MẶT HÀNG (dọc 2 dòng) | từng nhóm Ngày (ngang theo số Phòng) | Total/Total/Ghi chú/Đơn giá (dọc 2 dòng) | Ghi chú cuối bảng
+    // Merge: Title | STT/CODE/TÊN MẶT HÀNG (dọc 2 dòng) | từng nhóm Ngày (ngang theo số Phòng) | TOTAL (ngang qua FOC+BILLED) | Ghi chú/Đơn giá (dọc 2 dòng) | Ghi chú cuối bảng
     const merges = [{ s: { r: 0, c: 0 }, e: { r: 0, c: lastCol } }, { s: { r: LEGEND_ROW, c: 0 }, e: { r: LEGEND_ROW, c: lastCol } }];
     [0, 1, 2].forEach((c) => merges.push({ s: { r: HEADER_ROW, c }, e: { r: SUBHEADER_ROW, c } }));
     dayGroups.forEach((g, idx) => {
@@ -854,14 +946,15 @@ function DailyBillsTab({ thang, catalog, onBillsChanged, refreshToken }) {
       const endC = startC + g.rooms.length - 1;
       if (endC > startC) merges.push({ s: { r: HEADER_ROW, c: startC }, e: { r: HEADER_ROW, c: endC } });
     });
-    [totalSLCol, totalTienCol, ghiChuCol, donGiaCol].forEach((c) => merges.push({ s: { r: HEADER_ROW, c }, e: { r: SUBHEADER_ROW, c } }));
+    merges.push({ s: { r: HEADER_ROW, c: totalFOCCol }, e: { r: HEADER_ROW, c: totalBilledCol } });
+    [ghiChuCol, donGiaCol].forEach((c) => merges.push({ s: { r: HEADER_ROW, c }, e: { r: SUBHEADER_ROW, c } }));
     ws['!merges'] = merges;
 
     ws['!cols'] = Array.from({ length: lastCol + 1 }, (_, c) => {
       if (c === 0) return { wch: 5 };
       if (c === 1) return { wch: 11 };
       if (c === 2) return { wch: 24 };
-      if (c === totalSLCol || c === totalTienCol || c === ghiChuCol || c === donGiaCol) return { wch: 11 };
+      if (c === totalFOCCol || c === totalBilledCol || c === ghiChuCol || c === donGiaCol) return { wch: 11 };
       return { wch: 6 };
     });
 
@@ -897,7 +990,7 @@ function DailyBillsTab({ thang, catalog, onBillsChanged, refreshToken }) {
     for (let r = DATA_START; r < LEGEND_ROW; r++) {
       for (let c = 0; c <= lastCol; c++) {
         const isTenHang = c === 2;
-        const isMoney = c === totalSLCol || c === totalTienCol || c === donGiaCol;
+        const isMoney = c === totalFOCCol || c === totalBilledCol || c === donGiaCol;
         setStyle(r, c, {
           font: { sz: 10, name: 'Times New Roman', bold: isTenHang },
           alignment: { horizontal: isTenHang ? 'left' : isMoney ? 'right' : 'center', vertical: 'center' },
@@ -977,9 +1070,14 @@ function DailyBillsTab({ thang, catalog, onBillsChanged, refreshToken }) {
         <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-md">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <h3 className="text-sm font-bold uppercase text-[#141414]">Lịch Sử Daily Bills</h3>
-            <button onClick={handleExportDailyBillsMatrix} className="flex items-center gap-1 rounded bg-emerald-600 px-2.5 py-1.5 text-[11px] font-bold text-white hover:bg-emerald-700">
-              <Download className="h-3.5 w-3.5" /> Xuất Báo Cáo Daily Bills (Excel)
-            </button>
+            <div className="flex items-center gap-1.5">
+              <button onClick={() => setShowMatrixPreview(true)} className="flex items-center gap-1 rounded border border-[#141414] bg-white px-2.5 py-1.5 text-[11px] font-bold text-[#141414] hover:bg-[#E4E3E0]">
+                <Eye className="h-3.5 w-3.5" /> Xem Nhanh
+              </button>
+              <button onClick={handleExportDailyBillsMatrix} className="flex items-center gap-1 rounded bg-emerald-600 px-2.5 py-1.5 text-[11px] font-bold text-white hover:bg-emerald-700">
+                <Download className="h-3.5 w-3.5" /> Xuất Báo Cáo Daily Bills (Excel)
+              </button>
+            </div>
           </div>
           <div className="mb-3 flex flex-wrap items-center gap-2 text-xs">
             <span className="text-slate-500">Từ ngày</span>
@@ -1051,6 +1149,16 @@ function DailyBillsTab({ thang, catalog, onBillsChanged, refreshToken }) {
           </div>
         </div>
       </div>
+
+      {showMatrixPreview && (
+        <DailyBillsMatrixPreviewModal
+          bills={bills}
+          catalog={catalog}
+          thang={thang}
+          onClose={() => setShowMatrixPreview(false)}
+          onExport={handleExportDailyBillsMatrix}
+        />
+      )}
     </div>
   );
 }
