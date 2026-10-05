@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
-  Coffee, Download, Printer, Loader2, X, AlertTriangle, Plus, RefreshCw,
-  Layers, Receipt, ChevronDown, Edit2, Trash2, FileUp, Search,
+  Coffee, Download, Printer, Loader2, X, AlertTriangle, Plus, Minus, RefreshCw,
+  Layers, Receipt, ChevronDown, Edit2, Trash2, FileUp, Search, Rocket,
 } from 'lucide-react';
 import * as XLSX from 'xlsx-js-style';
 import { useStore } from '../../context/StoreContext';
@@ -12,6 +12,7 @@ import {
   getMinibarSetup, saveMinibarSetupItem,
   getMinibarFBFO, saveMinibarFBFOItem,
   getMinibarBills, saveMinibarBill, deleteMinibarBill,
+  getMinibarNoPostBills, saveMinibarNoPostBill, deleteMinibarNoPostBill,
   getMinibarSummary, saveMinibarSummaryItem,
 } from '../../services/supabaseMinibarService';
 
@@ -53,6 +54,37 @@ const gridKeyNav = (e, field) => {
   if ((e.key === 'Enter' || e.key === 'ArrowDown') && idx < inputs.length - 1) inputs[idx + 1].focus();
   else if (e.key === 'ArrowUp' && idx > 0) inputs[idx - 1].focus();
 };
+
+// ==================================================================
+// Ô số lượng có nút Tăng/Giảm (dùng chung cho BILL / FOC / NO POST)
+// ==================================================================
+const QTY_STEPPER_THEME = {
+  bill: { label: 'text-blue-500', btn: 'border-blue-300 bg-blue-50 text-blue-600 hover:bg-blue-100', input: 'border-blue-300 bg-blue-50' },
+  foc: { label: 'text-amber-600', btn: 'border-amber-300 bg-amber-50 text-amber-600 hover:bg-amber-100', input: 'border-amber-300 bg-amber-50' },
+  nopost: { label: 'text-purple-600', btn: 'border-purple-300 bg-purple-50 text-purple-600 hover:bg-purple-100', input: 'border-purple-300 bg-purple-50' },
+};
+
+function QtyStepper({ label, theme, value, onChange }) {
+  const t = QTY_STEPPER_THEME[theme];
+  const n = Number(value) || 0;
+  const dec = () => onChange(String(Math.max(0, n - 1)));
+  const inc = () => onChange(String(n + 1));
+  return (
+    <div>
+      <label className={`mb-0.5 block text-center text-[9px] font-bold ${t.label}`}>{label}</label>
+      <div className="flex items-center gap-0.5">
+        <button type="button" onClick={dec} className={`flex h-6 w-6 flex-shrink-0 items-center justify-center rounded border ${t.btn}`}>
+          <Minus className="h-3 w-3" />
+        </button>
+        <input type="number" value={value ?? ''} onChange={(e) => onChange(e.target.value)}
+          className={`w-11 rounded border-2 ${t.input} px-1 py-1 text-center text-sm focus:outline-none`} placeholder="0" />
+        <button type="button" onClick={inc} className={`flex h-6 w-6 flex-shrink-0 items-center justify-center rounded border ${t.btn}`}>
+          <Plus className="h-3 w-3" />
+        </button>
+      </div>
+    </div>
+  );
+}
 
 // ==================================================================
 // Modal: Thêm Item Minibar mới vào danh mục
@@ -567,7 +599,7 @@ function SummaryTab({ thang, catalog, onReloadCatalog, refreshToken }) {
 // ==================================================================
 // SUB 4A: Ghi Nhận Daily Bills
 // ==================================================================
-function DailyBillsTab({ thang, catalog, onBillsChanged }) {
+function DailyBillsTab({ thang, catalog, onBillsChanged, refreshToken }) {
   const [bills, setBills] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -601,6 +633,20 @@ function DailyBillsTab({ thang, catalog, onBillsChanged }) {
   }, [thang]);
 
   useEffect(() => { load(); }, [load]);
+
+  // Nạp lại NGẦM (không bật spinner toàn khối) khi có thay đổi từ nơi khác —
+  // VD vừa "Post Bill" 1 Bill No Post ở tab Danh Sách Bill No Post, dữ liệu
+  // mới cần hiện ngay tại đây mà không làm gián đoạn người đang xem/nhập liệu.
+  const loadQuiet = useCallback(async () => {
+    try {
+      const data = await getMinibarBills(thang);
+      setBills(data);
+    } catch (err) {
+      setError(err.message);
+    }
+  }, [thang]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { if (refreshToken) loadQuiet(); }, [refreshToken]);
 
   const groupedBills = useMemo(() => {
     const map = {};
@@ -643,25 +689,37 @@ function DailyBillsTab({ thang, catalog, onBillsChanged }) {
 
   const handlePost = async () => {
     if (!phong) { setError('Vui lòng nhập số phòng.'); return; }
-    const items = catalog
-      .map((c) => {
-        const q = quantities[c.TenHang] || {};
-        const slBill = parseAmount(q.bill);
-        const slFOC = parseAmount(q.foc);
-        if (slBill === 0 && slFOC === 0) return null;
-        return { tenHang: c.TenHang, dvt: c.DVT, donGia: c.DonGia, slBill, slFOC };
-      })
-      .filter(Boolean);
+    // Tách riêng 2 nhóm: Item có BILL/FOC -> post ngay như trước (minibar_bills);
+    // Item chỉ có NO POST -> lưu riêng vào minibar_nopost_bills, CHƯA tính vào
+    // Báo Cáo Tổng, chờ xử lý thủ công tại tab "Danh Sách Bill No Post".
+    const billItems = [];
+    const noPostItems = [];
+    catalog.forEach((c) => {
+      const q = quantities[c.TenHang] || {};
+      const slBill = parseAmount(q.bill);
+      const slFOC = parseAmount(q.foc);
+      const slNoPost = parseAmount(q.nopost);
+      if (slBill > 0 || slFOC > 0) billItems.push({ tenHang: c.TenHang, dvt: c.DVT, donGia: c.DonGia, slBill, slFOC });
+      if (slNoPost > 0) noPostItems.push({ tenHang: c.TenHang, dvt: c.DVT, donGia: c.DonGia, slNoPost });
+    });
 
-    if (items.length === 0) { setError('Vui lòng nhập số lượng cho ít nhất 1 Item.'); return; }
+    if (billItems.length === 0 && noPostItems.length === 0) {
+      setError('Vui lòng nhập số lượng cho ít nhất 1 Item.');
+      return;
+    }
 
     setPosting(true);
     setError(null);
     try {
-      await saveMinibarBill(thang, { billId: editingBillId, phong, ngay, tang: '', nguoiBaoCao, items, ghiChu: '' });
+      if (billItems.length > 0) {
+        await saveMinibarBill(thang, { billId: editingBillId, phong, ngay, tang: '', nguoiBaoCao, items: billItems, ghiChu: '' });
+      }
+      if (noPostItems.length > 0) {
+        await saveMinibarNoPostBill(thang, { phong, ngay, tang: '', nguoiBaoCao, items: noPostItems, ghiChu: '' });
+      }
       resetForm();
       await load();
-      onBillsChanged?.(); // báo cho Bảng Báo Cáo Tổng tự cập nhật ngầm
+      onBillsChanged?.(); // báo cho Bảng Báo Cáo Tổng + Danh Sách Bill No Post tự cập nhật ngầm
     } catch (err) {
       setError('Lỗi khi Post Bill: ' + err.message);
     } finally {
@@ -727,22 +785,15 @@ function DailyBillsTab({ thang, catalog, onBillsChanged }) {
               <p className="py-6 text-center text-sm text-slate-400">Chưa có Item Minibar nào — vào tab "Bảng Báo Cáo Tổng" để thêm.</p>
             ) : (
               catalog.map((c) => (
-                <div key={c.TenHang} className="flex items-center justify-between rounded border border-slate-200 p-2.5">
-                  <div>
+                <div key={c.TenHang} className="flex flex-wrap items-center justify-between gap-y-2 rounded border border-slate-200 p-2.5">
+                  <div className="min-w-[110px] pr-1">
                     <p className="text-sm font-semibold text-[#141414]">{c.TenHang}</p>
                     <p className="text-[11px] text-slate-400">{fmtNumber(c.DonGia)} đ / {c.DVT}</p>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <div>
-                      <label className="mb-0.5 block text-center text-[9px] font-bold text-blue-500">BILL</label>
-                      <input type="number" value={quantities[c.TenHang]?.bill ?? ''} onChange={(e) => setQty(c.TenHang, 'bill', e.target.value)}
-                        className="w-14 rounded border-2 border-blue-300 bg-blue-50 px-1.5 py-1 text-center text-sm focus:outline-none" placeholder="0" />
-                    </div>
-                    <div>
-                      <label className="mb-0.5 block text-center text-[9px] font-bold text-amber-600">FOC</label>
-                      <input type="number" value={quantities[c.TenHang]?.foc ?? ''} onChange={(e) => setQty(c.TenHang, 'foc', e.target.value)}
-                        className="w-14 rounded border-2 border-amber-300 bg-amber-50 px-1.5 py-1 text-center text-sm focus:outline-none" placeholder="0" />
-                    </div>
+                  <div className="flex items-center gap-1.5">
+                    <QtyStepper label="BILL" theme="bill" value={quantities[c.TenHang]?.bill} onChange={(v) => setQty(c.TenHang, 'bill', v)} />
+                    <QtyStepper label="FOC" theme="foc" value={quantities[c.TenHang]?.foc} onChange={(v) => setQty(c.TenHang, 'foc', v)} />
+                    <QtyStepper label="NO POST" theme="nopost" value={quantities[c.TenHang]?.nopost} onChange={(v) => setQty(c.TenHang, 'nopost', v)} />
                   </div>
                 </div>
               ))
@@ -809,11 +860,11 @@ function DailyBillsTab({ thang, catalog, onBillsChanged }) {
                               const lineTotal = (Number(it.SLBill) || 0) * (Number(it.DonGia) || 0);
                               return (
                                 <div key={idx} className="grid grid-cols-[1fr_auto_auto] items-center gap-2">
-                                  <span className="truncate">
+                                  <span className="truncate text-sm font-semibold text-slate-800">
                                     {it.TenHang}
-                                    {it.SLFOC > 0 && <span className="ml-1 text-amber-600">(FOC x{it.SLFOC})</span>}
+                                    {it.SLFOC > 0 && <span className="ml-1 text-xs font-medium text-amber-600">(FOC x{it.SLFOC})</span>}
                                   </span>
-                                  <span className="w-10 text-right text-slate-500">{it.SLBill > 0 ? `x${it.SLBill}` : '—'}</span>
+                                  <span className="w-12 text-right text-lg font-extrabold text-red-600">{it.SLBill > 0 ? `x${it.SLBill}` : '—'}</span>
                                   <span className="w-20 text-right text-slate-500">{fmtNumber(lineTotal)} đ</span>
                                 </div>
                               );
@@ -830,6 +881,127 @@ function DailyBillsTab({ thang, catalog, onBillsChanged }) {
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+// ==================================================================
+// SUB 4C: Danh Sách Bill NO POST — tiêu dùng thực tế nhưng chưa post lên PMS
+// ==================================================================
+function NoPostBillsTab({ thang, onPosted }) {
+  const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [postingId, setPostingId] = useState(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await getMinibarNoPostBills(thang);
+      setRows(data);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }, [thang]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const groupedBills = useMemo(() => {
+    const map = {};
+    rows.forEach((r) => {
+      if (!map[r.BillId]) map[r.BillId] = { billId: r.BillId, ngay: r.Ngay, phong: r.Phong, tang: r.Tang, nguoiBaoCao: r.NguoiBaoCao, items: [] };
+      map[r.BillId].items.push(r);
+    });
+    return Object.values(map).sort((a, b) => (b.ngay || '').localeCompare(a.ngay || ''));
+  }, [rows]);
+
+  // Post Bill thật sự: chuyển SL No Post -> SL Bill, ghi vào minibar_bills (sẽ
+  // tính vào Billed của Bảng Báo Cáo Tổng + hiện trong Lịch Sử Daily Bills),
+  // rồi xoá dòng No Post tương ứng.
+  const handlePostNow = async (bill) => {
+    setPostingId(bill.billId);
+    setError(null);
+    try {
+      const items = bill.items.map((it) => ({ tenHang: it.TenHang, dvt: it.DVT, donGia: it.DonGia, slBill: it.SLNoPost, slFOC: 0 }));
+      await saveMinibarBill(thang, { billId: null, phong: bill.phong, ngay: bill.ngay, tang: bill.tang, nguoiBaoCao: bill.nguoiBaoCao, items, ghiChu: '' });
+      await deleteMinibarNoPostBill(thang, bill.billId);
+      setRows((prev) => prev.filter((r) => r.BillId !== bill.billId));
+      onPosted?.(); // báo cho Bảng Báo Cáo Tổng + Lịch Sử Daily Bills tự cập nhật ngầm
+    } catch (err) {
+      setError('Lỗi khi Post Bill: ' + err.message);
+    } finally {
+      setPostingId(null);
+    }
+  };
+
+  const handleDiscard = async (billId) => {
+    if (!window.confirm('Xoá bỏ Bill No Post này? (Không post lên PMS)')) return;
+    try {
+      await deleteMinibarNoPostBill(thang, billId);
+      setRows((prev) => prev.filter((r) => r.BillId !== billId));
+    } catch (err) {
+      setError('Lỗi khi xoá: ' + err.message);
+    }
+  };
+
+  return (
+    <div>
+      {error && (
+        <div className="mb-3 flex items-center justify-between rounded border border-red-500 bg-red-50 px-3 py-2 text-sm text-red-700">
+          <span>{error}</span><button onClick={() => setError(null)}><X className="h-4 w-4" /></button>
+        </div>
+      )}
+      <div className="mb-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-xs text-amber-800">
+        <AlertTriangle className="mr-1 inline h-4 w-4" />
+        Đây là các Bill có tiêu dùng Minibar thực tế nhưng <b>CHƯA được tính vào Billed/Bảng Báo Cáo Tổng</b>.
+        Bấm <b>Post Bill</b> khi đã post được lên PMS để chuyển chính thức sang Lịch Sử Daily Bills.
+      </div>
+
+      {loading ? (
+        <div className="py-16 text-center text-slate-400"><Loader2 className="mx-auto h-6 w-6 animate-spin" /></div>
+      ) : groupedBills.length === 0 ? (
+        <p className="rounded-xl border border-slate-200 bg-white py-12 text-center text-sm text-slate-400 shadow-md">
+          Không có Bill No Post nào đang treo 🎉
+        </p>
+      ) : (
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {groupedBills.map((b) => {
+            const total = b.items.reduce((s, it) => s + (Number(it.SLNoPost) || 0) * (Number(it.DonGia) || 0), 0);
+            return (
+              <div key={b.billId} className="rounded-xl border-2 border-amber-300 bg-amber-50/60 p-3 shadow-md">
+                <div className="mb-1.5 flex items-center justify-between border-b border-amber-200 pb-1.5">
+                  <span className="rounded border border-amber-400 bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">
+                    Phòng {b.phong}
+                  </span>
+                  <span className="text-xs text-slate-500">{fmtDateDisplay(b.ngay)}</span>
+                </div>
+                <div className="space-y-0.5 text-xs">
+                  {b.items.map((it, idx) => (
+                    <div key={idx} className="flex items-center justify-between">
+                      <span className="font-medium text-slate-700">{it.TenHang} x{it.SLNoPost}</span>
+                      <span className="text-slate-500">{fmtNumber((it.SLNoPost || 0) * (it.DonGia || 0))} đ</span>
+                    </div>
+                  ))}
+                </div>
+                <p className="mt-1 border-t border-amber-200 pt-1 text-[10px] text-slate-500">NV Báo Cáo: {b.nguoiBaoCao || '—'}</p>
+                <p className="mt-0.5 text-xs font-bold text-slate-700">Tổng (chưa thuế): {fmtNumber(total)} đ</p>
+                <div className="mt-2 flex gap-1.5">
+                  <button onClick={() => handlePostNow(b)} disabled={postingId === b.billId}
+                    className="flex flex-1 items-center justify-center gap-1 rounded bg-emerald-600 px-2 py-1.5 text-xs font-bold text-white hover:bg-emerald-700 disabled:opacity-50">
+                    {postingId === b.billId ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Rocket className="h-3.5 w-3.5" />} POST BILL
+                  </button>
+                  <button onClick={() => handleDiscard(b.billId)} className="rounded border border-red-300 px-2 py-1.5 text-red-500 hover:bg-red-50">
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
@@ -1044,6 +1216,21 @@ export default function MinibarModule() {
   const [billsChangedToken, setBillsChangedToken] = useState(0);
   const notifyBillsChanged = () => setBillsChangedToken((t) => t + 1);
 
+  // Số Bill No Post đang treo — hiện làm badge cảnh báo ngay trên thẻ tab,
+  // kể cả khi chưa mở tab đó, để không bị quên xử lý.
+  const [noPostCount, setNoPostCount] = useState(0);
+  const loadNoPostCount = useCallback(async () => {
+    try {
+      const rows = await getMinibarNoPostBills(thang);
+      setNoPostCount(new Set(rows.map((r) => r.BillId)).size);
+    } catch {
+      // im lặng — không chặn UI nếu lỗi đếm badge (VD bảng minibar_nopost_bills chưa được tạo)
+    }
+  }, [thang]);
+  useEffect(() => { loadNoPostCount(); }, [loadNoPostCount]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { if (billsChangedToken) loadNoPostCount(); }, [billsChangedToken]);
+
   const loadCatalog = useCallback(async () => {
     try {
       const data = await getMinibarCatalog();
@@ -1073,14 +1260,26 @@ export default function MinibarModule() {
           { key: 'SUMMARY', label: 'BẢNG BÁO CÁO TỔNG MINIBAR', icon: Coffee },
           { key: 'BILLS', label: 'GHI NHẬN DAILY BILLS', icon: Receipt, activeClass: 'bg-yellow-400 text-[#141414] border-yellow-400', inactiveClass: 'bg-yellow-100 text-[#141414] hover:bg-yellow-200 border-yellow-400' },
           { key: 'SETUP', label: 'SET UP MINIBAR PHÒNG KHÁCH', icon: Layers },
-        ].map(({ key, label, icon: Icon, activeClass, inactiveClass }) => (
+          {
+            key: 'NOPOST', label: 'DANH SÁCH BILL NO POST', icon: AlertTriangle,
+            activeClass: 'bg-amber-400 text-[#141414] border-amber-500',
+            inactiveClass: 'bg-amber-200 text-[#141414] hover:bg-amber-300 border-amber-500',
+            badge: noPostCount > 0 ? noPostCount : null,
+          },
+        ].map(({ key, label, icon: Icon, activeClass, inactiveClass, badge }) => (
           <button key={key} onClick={() => goToTab(key)}
             className={`flex items-center gap-2 rounded border border-[#141414] px-3.5 py-1.5 text-xs font-bold ${
               activeTab === key
                 ? (activeClass || 'bg-[#141414] text-white')
                 : (inactiveClass || 'bg-white text-[#141414] hover:bg-[#E4E3E0]')
             }`}>
-            <Icon className="h-4 w-4" /> {label}
+            {key === 'NOPOST' ? <span className="text-sm leading-none">❗</span> : <Icon className="h-4 w-4" />}
+            {label}
+            {badge != null && (
+              <span className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-extrabold text-white">
+                {badge}
+              </span>
+            )}
           </button>
         ))}
       </div>
@@ -1096,12 +1295,17 @@ export default function MinibarModule() {
           )}
           {visitedTabs.BILLS && (
             <div className={activeTab === 'BILLS' ? '' : 'hidden'}>
-              <DailyBillsTab thang={thang} catalog={catalog} onBillsChanged={notifyBillsChanged} />
+              <DailyBillsTab thang={thang} catalog={catalog} onBillsChanged={notifyBillsChanged} refreshToken={billsChangedToken} />
             </div>
           )}
           {visitedTabs.SETUP && (
             <div className={activeTab === 'SETUP' ? '' : 'hidden'}>
               <SetupTab thang={thang} />
+            </div>
+          )}
+          {visitedTabs.NOPOST && (
+            <div className={activeTab === 'NOPOST' ? '' : 'hidden'}>
+              <NoPostBillsTab thang={thang} onPosted={notifyBillsChanged} />
             </div>
           )}
         </>
