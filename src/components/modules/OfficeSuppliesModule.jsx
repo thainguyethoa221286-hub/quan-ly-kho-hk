@@ -4,6 +4,7 @@ import * as XLSX from 'xlsx-js-style';
 import { useStore } from '../../context/StoreContext';
 // ⚠️ BẢN THỬ NGHIỆM (nhánh supabase-pilot): đọc/ghi qua Supabase.
 import { getVPPData, saveVPPItem, deleteVPPItem } from '../../services/supabaseVPPService';
+import { useConfirm } from '../common/useConfirm';
 
 const fmtNumber = (v) => (Number(v) || 0).toLocaleString('vi-VN');
 const nextMonthStr = (thang) => {
@@ -70,6 +71,7 @@ function AddVPPItemModal({ onCancel, onConfirm }) {
 }
 
 export default function OfficeSuppliesModule() {
+  const { confirm, ConfirmDialog } = useConfirm();
   const { selectedMonth } = useStore();
   const thang = selectedMonth;
 
@@ -133,7 +135,7 @@ export default function OfficeSuppliesModule() {
   };
 
   const handleDelete = async (rowIndex) => {
-    if (!window.confirm('Xoá mặt hàng này khỏi danh sách VPP?')) return;
+    if (!(await confirm('Xoá mặt hàng này khỏi danh sách VPP?'))) return;
     try {
       await deleteVPPItem(thang, rowIndex);
       setItems((prev) => prev.filter((it) => it.rowIndex !== rowIndex));
@@ -281,7 +283,7 @@ export default function OfficeSuppliesModule() {
       </div>
 
       {showAddModal && <AddVPPItemModal onCancel={() => setShowAddModal(false)} onConfirm={handleAddItem} />}
-
+      {ConfirmDialog}
     </div>
   );
 }
