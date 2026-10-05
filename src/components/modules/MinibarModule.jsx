@@ -773,8 +773,13 @@ function DailyBillsTab({ thang, catalog, onBillsChanged, refreshToken }) {
   const groupedBills = useMemo(() => {
     const map = {};
     bills.forEach((r) => {
-      if (!map[r.BillId]) map[r.BillId] = { billId: r.BillId, ngay: r.Ngay, phong: r.Phong, tang: r.Tang, nguoiBaoCao: r.NguoiBaoCao, items: [] };
+      // `order` = rowIndex lớn nhất trong các dòng của Bill này — Bill mới Post
+      // luôn có rowIndex (id) lớn hơn Bill cũ, dùng để sắp Bill mới lên ĐẦU danh
+      // sách trong cùng 1 Ngày (xem billsByDate bên dưới), tránh nhân viên nhìn
+      // nhầm vì Bill mới nhất lại nằm tít dưới cùng.
+      if (!map[r.BillId]) map[r.BillId] = { billId: r.BillId, ngay: r.Ngay, phong: r.Phong, tang: r.Tang, nguoiBaoCao: r.NguoiBaoCao, items: [], order: r.rowIndex };
       map[r.BillId].items.push(r);
+      if (r.rowIndex > map[r.BillId].order) map[r.BillId].order = r.rowIndex;
     });
     let list = Object.values(map).sort((a, b) => (b.ngay || '').localeCompare(a.ngay || ''));
     if (fromDate) list = list.filter((b) => b.ngay >= fromDate);
@@ -784,6 +789,7 @@ function DailyBillsTab({ thang, catalog, onBillsChanged, refreshToken }) {
 
   // Gom các Bill theo từng Ngày để hiện 1 header riêng cho mỗi nhóm Ngày
   // trong Lịch Sử Daily Bills (dễ tra soát hơn khi list nhiều Bill liền nhau).
+  // Trong cùng 1 Ngày, Bill nào Post SAU (order/rowIndex lớn hơn) hiện LÊN ĐẦU.
   const billsByDate = useMemo(() => {
     const map = {};
     groupedBills.forEach((b) => {
@@ -792,7 +798,7 @@ function DailyBillsTab({ thang, catalog, onBillsChanged, refreshToken }) {
     });
     return Object.keys(map)
       .sort((a, b) => (b || '').localeCompare(a || ''))
-      .map((ngay) => ({ ngay, bills: map[ngay] }));
+      .map((ngay) => ({ ngay, bills: [...map[ngay]].sort((a, b) => (b.order || 0) - (a.order || 0)) }));
   }, [groupedBills]);
 
   const seqLabel = (billId, phongVal, ngayVal) => {
@@ -1037,7 +1043,16 @@ function DailyBillsTab({ thang, catalog, onBillsChanged, refreshToken }) {
             <input value={nguoiBaoCao} onChange={(e) => setNguoiBaoCao(e.target.value)} className="w-full rounded border border-slate-300 px-2 py-2 text-sm focus:outline-none" placeholder="VD: HK Supervisor" />
           </div>
 
-          <p className="mb-2 text-xs font-semibold text-slate-600">Chọn Item</p>
+          {/* Nút Post Bill đặt NGAY Ở ĐÂY (song song với "Chọn Item", NGOÀI khung cuộn danh
+              sách Item bên dưới) — để luôn nhìn thấy và bấm được ngay, không cần kéo xuống
+              cuối danh sách Item mới thấy nút như trước (đặc biệt bất tiện trên màn hình nhỏ). */}
+          <div className="mb-2 flex items-center justify-between">
+            <p className="text-xs font-semibold text-slate-600">Chọn Item</p>
+            <button onClick={handlePost} disabled={posting}
+              className="flex items-center gap-1 rounded bg-red-600 px-3 py-1.5 text-xs font-extrabold text-white shadow-md shadow-red-500/40 hover:bg-red-700 disabled:opacity-50">
+              {posting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />} POST BILL
+            </button>
+          </div>
           <div className="max-h-[380px] space-y-2 overflow-y-auto pr-1">
             {catalog.length === 0 ? (
               <p className="py-6 text-center text-sm text-slate-400">Chưa có Item Minibar nào — vào tab "Bảng Báo Cáo Tổng" để thêm.</p>
@@ -1060,7 +1075,7 @@ function DailyBillsTab({ thang, catalog, onBillsChanged, refreshToken }) {
 
           <div className="mt-4 flex gap-2">
             {editingBillId && <button onClick={resetForm} className="rounded border border-[#141414] px-4 py-2 text-sm font-bold">Huỷ Sửa</button>}
-            <button onClick={handlePost} disabled={posting} className="flex flex-1 items-center justify-center gap-1.5 rounded bg-[#141414] px-4 py-2 text-sm font-bold text-white disabled:opacity-50">
+            <button onClick={handlePost} disabled={posting} className="flex flex-1 items-center justify-center gap-1.5 rounded bg-red-600 px-4 py-2 text-sm font-extrabold text-white shadow-md shadow-red-500/40 hover:bg-red-700 disabled:opacity-50">
               {posting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />} POST BILL
             </button>
           </div>
@@ -1220,6 +1235,8 @@ function NoPostBillsTab({ thang, onPosted }) {
     try {
       await deleteMinibarNoPostBill(thang, billId);
       setRows((prev) => prev.filter((r) => r.BillId !== billId));
+      onPosted?.(); // ⚠️ TRƯỚC ĐÂY thiếu dòng này -> xoá xong nhưng số đếm (huy hiệu đỏ) trên
+      // thẻ tab "DANH SÁCH BILL NO POST" không cập nhật, vẫn hiện số cũ dù đã xoá hết.
     } catch (err) {
       setError('Lỗi khi xoá: ' + err.message);
     }
