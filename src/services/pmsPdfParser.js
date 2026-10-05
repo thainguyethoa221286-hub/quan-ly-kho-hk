@@ -47,7 +47,13 @@ export function normalizeMinibarItemName(rawName) {
   return rawName.trim();
 }
 
-const HEADER_RE = /Số hóa đơn:\s*(\S+)\s*Ngày hóa đơn:\s*(\d{2}\/\d{2}\/\d{4})\s*Mã đặt phòng:\s*(\S+)\s*Số phòng:\s*(\S+)\s*Phòng gốc:\s*(\S+)\s*Nhân viên:\s*(.+)/;
+// ⚠️ TRƯỚC ĐÂY regex này còn bắt buộc phải có "Nhân viên: ..." nằm NGAY TRÊN CÙNG 1 DÒNG
+// với các trường còn lại. Khi tên nhân viên dài, PDF tự xuống dòng (wrap) phần "Nhân viên:"
+// sang dòng kế tiếp -> regex KHÔNG khớp -> hoá đơn đó bị bỏ qua, và các dòng sản phẩm phía
+// sau vô tình bị gán nhầm vào `current` của hoá đơn TRƯỚC (sai phòng/ngày, không chỉ thiếu dữ
+// liệu). Giá trị "Nhân viên" (h[6]) thực ra KHÔNG được dùng ở đâu trong parseLines() cả, nên bỏ
+// hẳn phần bắt buộc này khỏi regex là an toàn và tránh được lỗi gán sai phòng nói trên.
+const HEADER_RE = /Số hóa đơn:\s*(\S+)\s*Ngày hóa đơn:\s*(\d{2}\/\d{2}\/\d{4})\s*Mã đặt phòng:\s*(\S+)\s*Số phòng:\s*(\S+)\s*Phòng gốc:\s*(\S+)/;
 const PRODUCT_RE = /^(BQ\d+)\s+(.+?)\s+([\d,]+)\s+(\d+)\s+([\d,]+)\s+(\d+)$/;
 
 function toISODate(ddmmyyyy) {
@@ -64,8 +70,13 @@ function extractLinesFromPage(content) {
     rows[y].push({ x: item.transform[4], text: item.str });
   });
   const sortedY = Object.keys(rows).map(Number).sort((a, b) => b - a); // PDF: y lớn = ở trên
+  // ⚠️ .normalize('NFC') — Một số PDF (tuỳ font/engine xuất PDF của PMS) trả về chữ có dấu tiếng
+  // Việt bị LẪN 2 KIỂU Unicode khác nhau cho CÙNG 1 chữ (VD "ò" lúc là 1 ký tự dựng sẵn, lúc lại
+  // là "o" + dấu huyền ghép riêng) ngay trong CÙNG 1 dòng. Mắt nhìn thấy giống nhau 100% nhưng so
+  // khớp chuỗi/regex thì KHÁC NHAU -> khiến dòng đó không khớp được mẫu mong đợi. Chuẩn hoá về 1
+  // kiểu duy nhất (NFC) ngay sau khi ghép dòng để tránh lỗi âm thầm này.
   return sortedY
-    .map((y) => rows[y].sort((a, b) => a.x - b.x).map((t) => t.text).join(' ').replace(/\s+/g, ' ').trim())
+    .map((y) => rows[y].sort((a, b) => a.x - b.x).map((t) => t.text).join(' ').replace(/\s+/g, ' ').trim().normalize('NFC'))
     .filter(Boolean);
 }
 
