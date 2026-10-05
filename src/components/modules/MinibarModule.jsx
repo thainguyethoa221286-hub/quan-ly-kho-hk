@@ -972,6 +972,10 @@ function DailyBillsTab({ thang, catalog, onBillsChanged, refreshToken }) {
                   <div className="space-y-2 bg-slate-50/60 px-0.5 py-2">
                     {billsOfDay.map((b) => {
                       const seq = seqLabel(b.billId, b.phong, b.ngay);
+                      // Tổng Tiền Bill (badge xanh lá) = Tổng (SLBill x Đơn Giá) các Item,
+                      // ĐÃ gồm Thuế VAT 8% + Phụ phí phục vụ 5% (tổng +13%).
+                      const totalNoTax = b.items.reduce((s, it) => s + (Number(it.SLBill) || 0) * (Number(it.DonGia) || 0), 0);
+                      const totalWithTax = totalNoTax * (1 + VAT_RATE + SERVICE_CHARGE_RATE);
                       return (
                         <div key={b.billId} className="rounded border border-[#141414] bg-white p-3">
                           <div className="mb-1.5 flex items-center justify-between border-b border-slate-100 pb-1.5">
@@ -979,25 +983,22 @@ function DailyBillsTab({ thang, catalog, onBillsChanged, refreshToken }) {
                               Phòng {b.phong}{seq > 1 ? ` (${seq})` : ''}
                             </span>
                             <div className="flex items-center gap-1.5">
+                              <span className="text-xs font-bold text-emerald-600">{fmtNumber(totalWithTax)} đ</span>
                               <button onClick={() => handleEditBill(b)} className="text-slate-400 hover:text-[#141414]"><Edit2 className="h-3.5 w-3.5" /></button>
                               <button onClick={() => handleDeleteBill(b.billId)} className="text-red-400 hover:text-red-600"><Trash2 className="h-3.5 w-3.5" /></button>
                             </div>
                           </div>
-                          {/* Chi tiết từng Item — 3 cột riêng: Tên Item | Số lượng | Thành tiền (ĐÃ gồm VAT 8% + Phụ phí phục vụ 5%) */}
+                          {/* Chi tiết từng Item — chỉ còn Tên Item | Số lượng (đã bỏ cột Thành Tiền từng dòng) */}
                           <div className="space-y-1 text-xs">
-                            {b.items.map((it, idx) => {
-                              const lineTotal = (Number(it.SLBill) || 0) * (Number(it.DonGia) || 0) * (1 + VAT_RATE + SERVICE_CHARGE_RATE);
-                              return (
-                                <div key={idx} className="grid grid-cols-[1fr_auto_auto] items-center gap-2">
-                                  <span className="truncate text-sm font-semibold text-slate-800">
-                                    {it.TenHang}
-                                    {it.SLFOC > 0 && <span className="ml-1 text-xs font-medium text-amber-600">(FOC x{it.SLFOC})</span>}
-                                  </span>
-                                  <span className="w-12 text-right text-lg font-extrabold text-red-600">{it.SLBill > 0 ? `x${it.SLBill}` : '—'}</span>
-                                  <span className="w-20 text-right text-slate-500">{fmtNumber(lineTotal)} đ</span>
-                                </div>
-                              );
-                            })}
+                            {b.items.map((it, idx) => (
+                              <div key={idx} className="grid grid-cols-[1fr_auto] items-center gap-2">
+                                <span className="truncate text-sm font-semibold text-slate-800">
+                                  {it.TenHang}
+                                  {it.SLFOC > 0 && <span className="ml-1 text-xs font-medium text-amber-600">(FOC x{it.SLFOC})</span>}
+                                </span>
+                                <span className="w-12 text-right text-lg font-extrabold text-red-600">{it.SLBill > 0 ? `x${it.SLBill}` : '—'}</span>
+                              </div>
+                            ))}
                           </div>
                           <p className="mt-1 border-t border-slate-100 pt-1 text-[10px] text-slate-400">NV Báo Cáo: {b.nguoiBaoCao || '—'}</p>
                         </div>
