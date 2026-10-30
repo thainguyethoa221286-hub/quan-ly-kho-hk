@@ -4,15 +4,11 @@
  * ============================================================
  */
 import { supabase } from './supabaseClient';
-import { getKhoData, saveKhoItem } from './supabaseStoreService';
+import { getKhoData } from './supabaseStoreService';
 import { normalizeName, num } from './supabaseShared';
 
 const CATALOG_TABLE = 'damage_catalog';
 const RECORDS_TABLE = 'damage_records';
-
-// Chỉ 2 nhóm này mới cộng/trừ ngược vào HuHongMat bên Kho HK (Module 01).
-// Nhóm Minibar không đồng bộ ở đây (Module 04 tự tổng hợp trực tiếp).
-const SYNC_TO_STORE_GROUPS = ['CCDC', 'Amenities'];
 
 function catalogRowToItem(row) {
   return { rowIndex: row.id, TenHang: row.ten_hang, DVT: row.dvt, Nhom: row.nhom };
@@ -67,22 +63,10 @@ export async function getDamageData(thang) {
   return data.map(recordRowToItem);
 }
 
-/** Cộng/trừ SL vào HuHongMat bên Module 01 (nếu tìm thấy tên khớp) */
-async function adjustStoreHuHongMat(thang, tenHang, nhom, deltaSL) {
-  if (!SYNC_TO_STORE_GROUPS.includes(nhom)) return false;
-  const storeItems = await getKhoData(thang);
-  const match = storeItems.find((it) => it.TenHang === tenHang);
-  if (!match) return false;
-  const newHuHongMat = Math.max((Number(match.HuHongMat) || 0) + deltaSL, 0);
-  await saveKhoItem(thang, { ...match, HuHongMat: newHuHongMat });
-  return true;
-}
-
 /**
  * Lưu 1 dòng báo cáo hư hỏng.
- * - Tạo mới: nếu Nhóm CCDC/Amenities và Item trùng tên Kho HK -> cộng SL vào
- *   HuHongMat bên đó, đánh dấu Synced=true.
- * - Cập nhật dòng có sẵn: chỉ ghi đè, KHÔNG đụng lại đồng bộ.
+ * Không còn tự đồng bộ sang cột HƯ HỎNG / MẤT của Kho HK (Module 01) —
+ * cột đó giờ nhập tay trực tiếp bên Module 01.
  */
 export async function saveDamageItem(thang, item) {
   if (item.rowIndex) {
@@ -97,25 +81,19 @@ export async function saveDamageItem(thang, item) {
     return { rowIndex: item.rowIndex };
   }
 
-  const synced = await adjustStoreHuHongMat(thang, item.TenHang, item.Nhom, num(item.SL));
   const row = {
     thang, stt: num(item.Stt), ngay: item.Ngay, ten_hang: item.TenHang, nhom: item.Nhom,
     vi_tri: item.ViTri, sl: num(item.SL), hinh_thuc: item.HinhThuc,
     thu_khach: item.ThuKhach, foc_cost: num(item.FOCCost),
-    nguoi_bao_cao: item.NguoiBaoCao, ghi_chu: item.GhiChu, synced,
+    nguoi_bao_cao: item.NguoiBaoCao, ghi_chu: item.GhiChu,
   };
   const { data, error } = await supabase.from(RECORDS_TABLE).insert(row).select().single();
   if (error) throw new Error(error.message);
-  return { rowIndex: data.id, synced };
+  return { rowIndex: data.id };
 }
 
-/** Xoá 1 dòng hư hỏng — nếu từng đồng bộ, trừ ngược SL khỏi Kho HK */
+/** Xoá 1 dòng hư hỏng (không ảnh hưởng số liệu Kho HK) */
 export async function deleteDamageItem(thang, rowIndex) {
-  const { data: row, error: getErr } = await supabase.from(RECORDS_TABLE).select('*').eq('id', rowIndex).single();
-  if (getErr) throw new Error(getErr.message);
-  if (row && row.synced) {
-    await adjustStoreHuHongMat(thang, row.ten_hang, row.nhom, -(Number(row.sl) || 0));
-  }
   const { error } = await supabase.from(RECORDS_TABLE).delete().eq('id', rowIndex);
   if (error) throw new Error(error.message);
   return { deleted: rowIndex };
