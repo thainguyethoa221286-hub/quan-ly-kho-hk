@@ -298,7 +298,7 @@ function DailyTab({ thang, catalog, dailyRows, summary, canEdit, onSaved }) {
   }, [ngay, dailyRows]);
 
   const inMonth = ngay.startsWith(thang);
-  const daysEntered = useMemo(() => Array.from(new Set(dailyRows.map((r) => r.ngay))).sort(), [dailyRows]);
+  const enteredSet = useMemo(() => new Set(dailyRows.map((r) => r.ngay)), [dailyRows]);
   const hiddenNames = useMemo(() => new Set(summary.filter(isHiddenRow).map((r) => r.TenHang)), [summary]);
   const shownCatalog = useMemo(() => catalog.filter((c) => !hiddenNames.has(c.TenHang)), [catalog, hiddenNames]);
   const noCuoiMap = useMemo(() => Object.fromEntries(summary.map((s) => [s.TenHang, s.NoCuoi])), [summary]);
@@ -343,7 +343,7 @@ function DailyTab({ thang, catalog, dailyRows, summary, canEdit, onSaved }) {
   const rwSaveBar = (
     <div className="flex flex-wrap items-center gap-3">
       <button onClick={handleSave} disabled={!canEdit || saving || !inMonth}
-        className="flex items-center gap-1 rounded bg-[#141414] px-4 py-2 text-sm font-bold text-white hover:bg-slate-800 disabled:opacity-40">
+        className="flex items-center gap-2 rounded-lg bg-emerald-600 px-5 py-2 text-sm font-bold text-white shadow-md transition-all hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-40">
         {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Lưu số liệu ngày {fmtDateVN(ngay)}
       </button>
       {msg && (
@@ -354,38 +354,54 @@ function DailyTab({ thang, catalog, dailyRows, summary, canEdit, onSaved }) {
 
   return (
     <div>
-      <div className="mb-3 flex flex-wrap items-end gap-3 rounded border border-[#141414] bg-white p-3">
-        <div>
-          <label className="mb-1 block text-xs font-semibold text-slate-600">Ngày phát sinh</label>
-          <input type="date" value={ngay} min={`${thang}-01`} max={`${thang}-${pad2(daysInMonth(thang))}`} onChange={(e) => setNgay(e.target.value)}
-            className="rounded border border-slate-300 px-2 py-1.5 text-sm focus:outline-none" />
-        </div>
-        <p className="pb-2 text-sm font-bold">Ngày {fmtDateVN(ngay)}</p>
-        <div className="ml-auto flex flex-wrap items-center gap-2">
-          <button onClick={() => setShowView(true)}
-            className="flex items-center gap-1 rounded border border-[#141414] bg-white px-3 py-2 text-sm font-bold hover:bg-[#E4E3E0]">
-            <Eye className="h-4 w-4" /> Xem nhanh báo cáo tháng
-          </button>
-          <p className="text-xs text-slate-500">Tổng ngày: Dơ <strong>{fmtNumber(dayTotals.Do)}</strong> · Sạch <strong>{fmtNumber(dayTotals.Sach)}</strong> · RW Dơ <strong>{fmtNumber(dayTotals.RW)}</strong> · RW Sạch <strong>{fmtNumber(dayTotals.RWSach)}</strong></p>
-          <button onClick={handleSave} disabled={!canEdit || saving || !inMonth}
-            className="flex items-center gap-1 rounded bg-[#141414] px-4 py-2 text-sm font-bold text-white hover:bg-slate-800 disabled:opacity-40">
-            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Lưu số liệu ngày
-          </button>
-        </div>
-      </div>
+      {/* ---------- THANH CÔNG CỤ: chọn ngày + xem nhanh + lưu (gom trong 1 card) ---------- */}
+      <div className="mb-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="flex flex-wrap items-end gap-x-4 gap-y-3">
+          <div>
+            <label className="mb-1 block text-xs font-semibold text-slate-600">Ngày phát sinh</label>
+            <input type="date" value={ngay} min={`${thang}-01`} max={`${thang}-${pad2(daysInMonth(thang))}`} onChange={(e) => setNgay(e.target.value)}
+              className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+          </div>
+          <p className="pb-2 text-sm font-bold text-slate-800">Ngày {fmtDateVN(ngay)}</p>
 
-      {!inMonth && <p className="mb-2 rounded bg-amber-50 px-3 py-2 text-xs text-amber-700">Ngày đang chọn không thuộc tháng {pad2(m)}/{y}. Chọn ngày trong tháng làm việc để nhập.</p>}
-      {msg && (
-        <p className={`mb-2 rounded px-3 py-2 text-xs font-medium ${msg.type === 'ok' ? 'bg-emerald-50 text-emerald-700' : msg.type === 'warn' ? 'bg-amber-50 text-amber-700' : 'bg-red-50 text-red-700'}`}>{msg.text}</p>
-      )}
+          <div className="ml-auto flex flex-wrap items-center gap-3">
+            <p className="text-xs text-slate-500">
+              Tổng ngày: Dơ <strong className="text-slate-800">{fmtNumber(dayTotals.Do)}</strong> · Sạch <strong className="text-slate-800">{fmtNumber(dayTotals.Sach)}</strong> · RW Dơ <strong className="text-slate-800">{fmtNumber(dayTotals.RW)}</strong> · RW Sạch <strong className="text-slate-800">{fmtNumber(dayTotals.RWSach)}</strong>
+            </p>
+            <button onClick={() => setShowView(true)}
+              className="flex items-center gap-2 rounded-lg border border-sky-200 bg-sky-50 px-4 py-2 text-sm font-medium text-sky-700 transition-all hover:bg-sky-100">
+              <Eye className="h-4 w-4" /> Xem nhanh báo cáo tháng
+            </button>
+            <button onClick={handleSave} disabled={!canEdit || saving || !inMonth}
+              className="flex items-center gap-2 rounded-lg bg-emerald-600 px-5 py-2 text-sm font-bold text-white shadow-md transition-all hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-40">
+              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Lưu số liệu ngày
+            </button>
+          </div>
+        </div>
 
-      <div className="mb-3 flex flex-wrap items-center gap-1 text-[11px]">
-        <span className="text-slate-500">Ngày đã nhập:</span>
-        {daysEntered.length === 0 ? <span className="text-slate-400">chưa có</span> : daysEntered.map((d) => (
-          <button key={d} onClick={() => setNgay(d)} className={`rounded border px-1.5 py-0.5 ${d === ngay ? 'border-[#141414] bg-[#141414] text-white' : 'border-slate-300 bg-white hover:bg-amber-100'}`}>
-            {d.slice(8, 10)}
-          </button>
-        ))}
+        {!inMonth && <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700">Ngày đang chọn không thuộc tháng {pad2(m)}/{y}. Chọn ngày trong tháng làm việc để nhập.</p>}
+        {msg && (
+          <p className={`mt-3 rounded-lg px-3 py-2 text-xs font-medium ${msg.type === 'ok' ? 'bg-emerald-50 text-emerald-700' : msg.type === 'warn' ? 'bg-amber-50 text-amber-700' : 'bg-red-50 text-red-700'}`}>{msg.text}</p>
+        )}
+
+        <div className="mt-4 flex flex-wrap items-center gap-1.5">
+          <span className="mr-1 text-xs font-medium text-slate-500">Chọn nhanh ngày:</span>
+          {Array.from({ length: daysInMonth(thang) }, (_, i) => i + 1).map((d) => {
+            const full = `${thang}-${pad2(d)}`;
+            const selected = full === ngay;
+            const entered = enteredSet.has(full);
+            return (
+              <button key={d} onClick={() => setNgay(full)} title={entered ? `Ngày ${d}: đã có số liệu` : `Ngày ${d}: chưa nhập`}
+                className={`relative rounded-md px-2.5 py-1 text-xs font-medium transition-all ${selected ? 'bg-emerald-600 text-white shadow' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}>
+                {pad2(d)}
+                {entered && <span className={`absolute right-0.5 top-0.5 h-1.5 w-1.5 rounded-full ${selected ? 'bg-white' : 'bg-emerald-500'}`} />}
+              </button>
+            );
+          })}
+        </div>
+        <p className="mt-2 flex items-center gap-1.5 text-[11px] text-slate-400">
+          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /> chấm xanh = ngày đã có số liệu
+        </p>
       </div>
 
       <div className="max-h-[calc(100vh-340px)] overflow-auto rounded border border-[#141414] bg-white">
