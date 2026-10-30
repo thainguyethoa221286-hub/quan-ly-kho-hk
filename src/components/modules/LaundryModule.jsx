@@ -244,8 +244,8 @@ function QuickView({ thang, items, dailyRows, onPickDay, onClose }) {
                 <td rowSpan={2} className={stickyName}>{r.TenHang}</td>
                 <td className="border border-[#141414]/30 bg-red-50 px-1 text-center text-[10px] font-bold text-red-700">DƠ</td>
                 <td rowSpan={2} className={`${base} bg-yellow-50 font-semibold`}>{cell(noDK) || (noDK === 0 ? '0' : '')}</td>
-                {days.map((d) => <td key={d} className={`${base} bg-red-50/40`}>{cell(dm[d]?.[kD])}</td>)}
-                <td className={`${base} font-semibold`}>{fmtNumber(tD)}</td>
+                {days.map((d) => <td key={d} className={`${base} bg-red-50/40 font-medium text-red-600`}>{cell(dm[d]?.[kD])}</td>)}
+                <td className={`${base} font-semibold text-red-600`}>{fmtNumber(tD)}</td>
                 <td rowSpan={2} className={`${base} bg-yellow-100 font-bold ${no < 0 ? 'text-red-600' : ''}`}>{fmtNumber(no)}</td>
               </tr>
               <tr>
