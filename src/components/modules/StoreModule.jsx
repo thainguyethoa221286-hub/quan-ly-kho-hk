@@ -2,6 +2,8 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Search, Plus, Trash2, Download, Printer, RefreshCw, Loader2, X, Eye, EyeOff, AlertTriangle } from 'lucide-react';
 import * as XLSX from 'xlsx-js-style';
 import { useStore } from '../../context/StoreContext';
+import DecimalInput from '../common/DecimalInput';
+import { buildStandardSheet, makeStyler, FONT_NAME } from '../../services/excelService';
 // ⚠️ BẢN THỬ NGHIỆM (nhánh supabase-pilot): đang đọc/ghi qua Supabase thay
 // vì Google Sheets + Apps Script — chỉ đổi nguồn import, code còn lại của
 // module này giữ nguyên 100% không đổi gì cả.
@@ -92,10 +94,10 @@ function NewItemRow({ onSave, onCancel, nextStt }) {
         <input className="w-14 bg-transparent text-xs" placeholder="ĐVT" value={form.DVT} onChange={set('DVT')} />
       </td>
       <td className="border border-[#141414]/30 px-2 py-1">
-        <input type="number" className="w-16 bg-transparent text-xs" value={form.DauKy} onChange={set('DauKy')} />
+        <input type="number" step="any" className="w-16 bg-transparent text-xs" value={form.DauKy} onChange={set('DauKy')} />
       </td>
       <td className="border border-[#141414]/30 px-2 py-1">
-        <input type="number" className="w-16 bg-transparent text-xs" value={form.SetUp} onChange={set('SetUp')} />
+        <input type="number" step="any" className="w-16 bg-transparent text-xs" value={form.SetUp} onChange={set('SetUp')} />
       </td>
       <td colSpan={7} className="border border-[#141414]/30 px-2 py-1 text-center text-[10px] text-slate-500">
         Nhập / Transfer / Hư hỏng / Sử dụng / Tổng xuất / Tồn / Tổng kho — sửa sau khi lưu
@@ -337,129 +339,63 @@ export default function StoreModule() {
   // ---- Excel export (khớp mẫu báo cáo thật) ----
   const runExportExcel = (opts) => {
     const [y, m] = thang.split('-').map(Number);
-    const grey = 'D9D9D9';
-    const yellow = 'FFF2CC';
-    const red = 'FF0000';
-    const black = '141414';
+    const n = (v) => Number(v) || 0;
 
-    const thinBorder = {
-      top: { style: 'thin', color: { rgb: 'CCCCCC' } },
-      bottom: { style: 'thin', color: { rgb: 'CCCCCC' } },
-      left: { style: 'thin', color: { rgb: 'CCCCCC' } },
-      right: { style: 'thin', color: { rgb: 'CCCCCC' } },
-    };
+    const headers = [...EXCEL_HEADERS];
+    headers[4] = `ĐẦU KỲ ${String(m).padStart(2, '0')}/${y}`;
+    headers[11] = `TỒN ${lastDayOfMonthStr(thang)}`;
 
-    const aoa = [];
-    aoa.push([`CHỐT CÁC MẶT HÀNG CUỐI THÁNG ( TỪ NGÀY ${opts.tuNgay} - ${opts.denNgay} )`]);
-    aoa.push([`OCC: ${opts.occ || 0}%       ROOM NIGHT: ${opts.roomNight || 0}       Pax: ${opts.pax || 0}`]);
-    const headerRow = [...EXCEL_HEADERS];
-    headerRow[4] = `ĐẦU KỲ ${String(m).padStart(2, '0')}/${y}`;
-    headerRow[11] = `TỒN ${lastDayOfMonthStr(thang)}`;
-    aoa.push(headerRow);
-    aoa.push(['DANH MỤC VẬT TƯ KHO HK']);
-    const bannerRowIdx = aoa.length - 1;
-
-    const dataStartRow = aoa.length;
+    const rows = [{ banner: 'DANH MỤC VẬT TƯ KHO HK' }];
     items.forEach((it) => {
-      aoa.push([
-        it.Stt, it.MaHang, it.TenHang, it.DVT, it.DauKy, it.SetUp, it.Nhap,
-        it.Transfer, it.HuHongMat, it.SuDung, it.TongXuat, it.Ton, it.TongKho,
-        it.Cost, it.ThanhTien, it.GhiChu,
+      rows.push([
+        it.Stt, it.MaHang || '', it.TenHang, it.DVT, n(it.DauKy), n(it.SetUp), n(it.Nhap),
+        n(it.Transfer), n(it.HuHongMat), n(it.SuDung), n(it.TongXuat), n(it.Ton), n(it.TongKho),
+        n(it.Cost), n(it.ThanhTien), it.GhiChu || '',
       ]);
     });
-    const dataEndRow = aoa.length - 1;
+    rows.push({
+      total: [
+        '', '', 'TỔNG CỘNG', '', '', '', totals.Nhap, totals.Transfer,
+        totals.HuHongMat, totals.SuDung, totals.TongXuat, totals.Ton, totals.TongKho,
+        '', totals.ThanhTien, '',
+      ],
+    });
 
-    const totalRowIdx = aoa.length;
-    aoa.push([
-      '', '', 'TỔNG CỘNG', '', '', '', totals.Nhap, totals.Transfer,
-      totals.HuHongMat, totals.SuDung, totals.TongXuat, totals.Ton, totals.TongKho,
-      '', totals.ThanhTien, '',
-    ]);
+    const { ws, lastCol, nextRow } = buildStandardSheet({
+      title: `CHỐT CÁC MẶT HÀNG CUỐI THÁNG ( TỪ NGÀY ${opts.tuNgay} - ${opts.denNgay} )`,
+      subtitles: [`OCC: ${opts.occ || 0}%       ROOM NIGHT: ${opts.roomNight || 0}       Pax: ${opts.pax || 0}`],
+      headers,
+      colTypes: ['center', 'center', 'text', 'center', ...Array(11).fill('num'), 'text'],
+      // Cột TỒN (11) và SET UP (5) chữ đỏ như mẫu cũ
+      redCols: { 5: true, 11: true },
+      minWidths: [5, 12, 30, 7],
+      rows,
+    });
 
-    aoa.push([]);
-    aoa.push([]);
-    const dateRowIdx = aoa.length;
-    aoa.push([`Ngày ...... Tháng ...... Năm ${y}`]);
-    const sigTitleRowIdx = aoa.length;
-    aoa.push(['THỦ KHO VẬT TƯ', '', '', '', '', 'TRƯỞNG BP BUỒNG PHÒNG', '', '', '', '', 'KẾ TOÁN TRƯỞNG']);
-    const sigSubRowIdx = aoa.length;
-    aoa.push(['(Ký & ghi rõ họ tên)', '', '', '', '', '(Ký & ghi rõ họ tên)', '', '', '', '', '(Ký & ghi rõ họ tên)']);
-
-    const ws = XLSX.utils.aoa_to_sheet(aoa);
-    const lastCol = COL_COUNT - 1;
-
-    ws['!merges'] = [
-      { s: { r: 0, c: 0 }, e: { r: 0, c: lastCol } },
-      { s: { r: 1, c: 0 }, e: { r: 1, c: lastCol } },
-      { s: { r: bannerRowIdx, c: 0 }, e: { r: bannerRowIdx, c: lastCol } },
+    // ---- Khối chữ ký cuối báo cáo ----
+    const dateRowIdx = nextRow + 1;
+    const sigTitleRowIdx = dateRowIdx + 1;
+    const sigSubRowIdx = sigTitleRowIdx + 1;
+    XLSX.utils.sheet_add_aoa(ws, [
+      [`Ngày ...... Tháng ...... Năm ${y}`],
+      ['THỦ KHO VẬT TƯ', '', '', '', '', 'TRƯỞNG BP BUỒNG PHÒNG', '', '', '', '', 'KẾ TOÁN TRƯỞNG'],
+      ['(Ký & ghi rõ họ tên)', '', '', '', '', '(Ký & ghi rõ họ tên)', '', '', '', '', '(Ký & ghi rõ họ tên)'],
+    ], { origin: { r: dateRowIdx, c: 0 } });
+    ws['!merges'].push(
       { s: { r: dateRowIdx, c: 0 }, e: { r: dateRowIdx, c: lastCol } },
       { s: { r: sigTitleRowIdx, c: 0 }, e: { r: sigTitleRowIdx, c: 4 } },
       { s: { r: sigTitleRowIdx, c: 5 }, e: { r: sigTitleRowIdx, c: 9 } },
-      { s: { r: sigTitleRowIdx, c: 10 }, e: { r: sigTitleRowIdx, c: 15 } },
+      { s: { r: sigTitleRowIdx, c: 10 }, e: { r: sigTitleRowIdx, c: lastCol } },
       { s: { r: sigSubRowIdx, c: 0 }, e: { r: sigSubRowIdx, c: 4 } },
       { s: { r: sigSubRowIdx, c: 5 }, e: { r: sigSubRowIdx, c: 9 } },
-      { s: { r: sigSubRowIdx, c: 10 }, e: { r: sigSubRowIdx, c: 15 } },
-    ];
-
-    ws['!cols'] = [
-      { wch: 5 }, { wch: 12 }, { wch: 30 }, { wch: 7 }, { wch: 10 }, { wch: 8 },
-      { wch: 8 }, { wch: 9 }, { wch: 11 }, { wch: 9 }, { wch: 10 }, { wch: 10 },
-      { wch: 10 }, { wch: 12 }, { wch: 14 }, { wch: 18 },
-    ];
-
-    const setCellStyle = (r, c, style) => {
-      const ref = XLSX.utils.encode_cell({ r, c });
-      if (!ws[ref]) ws[ref] = { t: 's', v: '' };
-      ws[ref].s = { ...(ws[ref].s || {}), ...style };
-    };
-
-    setCellStyle(0, 0, { font: { bold: true, sz: 14, name: 'Times New Roman' }, alignment: { horizontal: 'center', vertical: 'center' } });
-    setCellStyle(1, 0, { font: { bold: true, sz: 11, name: 'Times New Roman' }, alignment: { horizontal: 'center' } });
-
-    // Header row — SET UP (c=5) và TỒN (c=11) chữ đỏ
-    for (let c = 0; c < COL_COUNT; c++) {
-      const isRed = c === 5 || c === 11;
-      setCellStyle(2, c, {
-        font: { bold: true, sz: 10, color: { rgb: isRed ? red : black }, name: 'Times New Roman' },
-        fill: { fgColor: { rgb: grey } },
-        alignment: { horizontal: 'center', vertical: 'center', wrapText: true },
-        border: thinBorder,
-      });
-    }
-
-    setCellStyle(bannerRowIdx, 0, {
-      font: { bold: true, sz: 10, color: { rgb: red }, name: 'Times New Roman' },
-      fill: { fgColor: { rgb: yellow } },
-      alignment: { horizontal: 'left', vertical: 'center' },
-    });
-
-    for (let r = dataStartRow; r <= dataEndRow; r++) {
-      for (let c = 0; c < COL_COUNT; c++) {
-        const isRed = c === 5 || c === 11;
-        const isNum = [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14].includes(c);
-        setCellStyle(r, c, {
-          font: { sz: 10, color: { rgb: isRed ? red : black }, name: 'Times New Roman' },
-          alignment: { horizontal: isNum ? 'right' : 'left', vertical: 'center' },
-          border: thinBorder,
-          ...(c === 13 || c === 14 ? { numFmt: '#,##0' } : {}),
-        });
-      }
-    }
-
-    for (let c = 0; c < COL_COUNT; c++) {
-      setCellStyle(totalRowIdx, c, {
-        font: { bold: true, sz: 10, name: 'Times New Roman' },
-        fill: { fgColor: { rgb: 'F2F2F2' } },
-        border: thinBorder,
-        ...(c === 13 || c === 14 ? { numFmt: '#,##0' } : {}),
-      });
-    }
-
+      { s: { r: sigSubRowIdx, c: 10 }, e: { r: sigSubRowIdx, c: lastCol } },
+    );
+    const setCellStyle = makeStyler(ws);
     [0, 5, 10].forEach((c) => {
-      setCellStyle(sigTitleRowIdx, c, { font: { bold: true, sz: 11, name: 'Times New Roman' }, alignment: { horizontal: 'center' } });
-      setCellStyle(sigSubRowIdx, c, { font: { italic: true, sz: 9, name: 'Times New Roman' }, alignment: { horizontal: 'center' } });
+      setCellStyle(sigTitleRowIdx, c, { font: { bold: true, sz: 11, name: FONT_NAME }, alignment: { horizontal: 'center' } });
+      setCellStyle(sigSubRowIdx, c, { font: { italic: true, sz: 9, name: FONT_NAME }, alignment: { horizontal: 'center' } });
     });
-    setCellStyle(dateRowIdx, 0, { font: { italic: true, sz: 10, name: 'Times New Roman' }, alignment: { horizontal: 'right' } });
+    setCellStyle(dateRowIdx, 0, { font: { italic: true, sz: 10, name: FONT_NAME }, alignment: { horizontal: 'right' } });
 
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, `Kho_${thang}`);
@@ -617,13 +553,23 @@ export default function StoreModule() {
                   </td>
                   <td className="border border-[#141414]/30 px-2 py-1">{it.DVT}</td>
                   <td className="border border-[#141414]/30 px-2 py-1 text-right">{fmtNumber(it.DauKy)}</td>
-                  <td className="border border-[#141414]/30 px-2 py-1 text-right">{fmtNumber(it.SetUp)}</td>
+                  <td className="border border-[#141414]/30 p-0">
+                    <DecimalInput
+                      data-field="SetUp"
+                      value={it.SetUp}
+                      onChange={(e) => handleFieldChange(it.rowIndex, 'SetUp', e.target.value)}
+                      onFocus={() => setFocusedRow(it.rowIndex)}
+                      onKeyDown={(e) => handleGridKeyDown(e, 'SetUp')}
+                      onBlur={() => { handleFieldBlur(it.rowIndex); setFocusedRow(null); }}
+                      disabled={!canEdit}
+                      className="w-16 bg-transparent px-2 py-1 text-right focus:bg-yellow-300 focus:outline-none focus:ring-2 focus:ring-yellow-500 disabled:cursor-not-allowed disabled:opacity-60"
+                    />
+                  </td>
 
                   <td className="border border-[#141414]/30 p-0">
-                    <input
-                      type="number"
+                    <DecimalInput
                       data-field="Nhap"
-                      value={inputVal(it.Nhap)}
+                      value={it.Nhap}
                       onChange={(e) => handleFieldChange(it.rowIndex, 'Nhap', e.target.value)}
                       onFocus={() => setFocusedRow(it.rowIndex)}
                       onKeyDown={(e) => handleGridKeyDown(e, 'Nhap')}
@@ -635,10 +581,9 @@ export default function StoreModule() {
 
                   {/* Editable: Ton (nhập tay, kiểm kê thực tế) — đặt ngay sau cột Nhập, nền vàng nhạt */}
                   <td className="border border-[#141414]/30 bg-yellow-100 p-0">
-                    <input
-                      type="number"
+                    <DecimalInput
                       data-field="Ton"
-                      value={inputVal(it.Ton)}
+                      value={it.Ton}
                       onChange={(e) => handleFieldChange(it.rowIndex, 'Ton', e.target.value)}
                       onFocus={() => setFocusedRow(it.rowIndex)}
                       onKeyDown={(e) => handleGridKeyDown(e, 'Ton')}
@@ -649,10 +594,9 @@ export default function StoreModule() {
                   </td>
 
                   <td className="border border-[#141414]/30 p-0">
-                    <input
-                      type="number"
+                    <DecimalInput
                       data-field="Transfer"
-                      value={inputVal(it.Transfer)}
+                      value={it.Transfer}
                       onChange={(e) => handleFieldChange(it.rowIndex, 'Transfer', e.target.value)}
                       onFocus={() => setFocusedRow(it.rowIndex)}
                       onKeyDown={(e) => handleGridKeyDown(e, 'Transfer')}
@@ -661,15 +605,17 @@ export default function StoreModule() {
                       className="w-16 bg-transparent px-2 py-1 text-right focus:bg-yellow-300 focus:outline-none focus:ring-2 focus:ring-yellow-500 disabled:cursor-not-allowed disabled:opacity-60"
                     />
                   </td>
-                  <td
-                    className={`border px-2 py-1 text-right ${
-                      Number(it.HuHongMat) > 0
-                        ? 'border-red-300 bg-red-100 font-bold text-red-700'
-                        : 'border-[#141414]/30 text-slate-500'
-                    }`}
-                    title="Tự động đồng bộ từ Module Hư Hỏng & Thiệt Hại"
-                  >
-                    {Number(it.HuHongMat) ? fmtNumber(it.HuHongMat) : ''}
+                  <td className="border border-[#141414]/30 p-0">
+                    <DecimalInput
+                      data-field="HuHongMat"
+                      value={it.HuHongMat}
+                      onChange={(e) => handleFieldChange(it.rowIndex, 'HuHongMat', e.target.value)}
+                      onFocus={() => setFocusedRow(it.rowIndex)}
+                      onKeyDown={(e) => handleGridKeyDown(e, 'HuHongMat')}
+                      onBlur={() => { handleFieldBlur(it.rowIndex); setFocusedRow(null); }}
+                      disabled={!canEdit}
+                      className="w-16 bg-transparent px-2 py-1 text-right focus:bg-yellow-300 focus:outline-none focus:ring-2 focus:ring-yellow-500 disabled:cursor-not-allowed disabled:opacity-60"
+                    />
                   </td>
                   <td className="border border-[#141414]/30 px-2 py-1 text-right font-semibold" title="Tự động tính = (Đầu kỳ + Nhập) − (Tồn + Transfer + Hư hỏng/mất)">
                     {fmtNumber(it.SuDung)}
