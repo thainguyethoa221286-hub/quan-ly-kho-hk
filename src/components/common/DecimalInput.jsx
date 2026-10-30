@@ -11,7 +11,7 @@ import { useState } from 'react';
  * onChange nhận về object có dạng { target: { value: '0.5' } } nên dùng được
  * y hệt onChange={(e)=>handle(..., e.target.value)} cũ.
  */
-export default function DecimalInput({ value, onChange, onFocus, onBlur, hideZero = true, ...rest }) {
+export default function DecimalInput({ value, onChange, onFocus, onBlur, hideZero = true, allowNegative = false, ...rest }) {
   const [draft, setDraft] = useState(null);
 
   const isEmpty = value === null || value === undefined || value === '';
@@ -31,7 +31,8 @@ export default function DecimalInput({ value, onChange, onFocus, onBlur, hideZer
       }}
       onChange={(e) => {
         const v = e.target.value.replace(',', '.');
-        if (v !== '' && !/^\d*\.?\d*$/.test(v)) return; // chỉ cho số + 1 dấu chấm
+        const re = allowNegative ? /^-?\d*\.?\d*$/ : /^\d*\.?\d*$/;
+        if (v !== '' && !re.test(v)) return; // chỉ cho số + 1 dấu chấm (và dấu trừ nếu allowNegative)
         setDraft(v);
         if (onChange) onChange({ target: { value: v } });
       }}
