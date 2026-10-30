@@ -241,6 +241,19 @@ function DailyTab({ thang, catalog, dailyRows, summary, canEdit, onSaved }) {
   const inputCls = 'w-24 rounded border border-slate-300 bg-white px-2 py-1 text-right focus:bg-yellow-200 focus:outline-none focus:ring-2 focus:ring-yellow-500 disabled:cursor-not-allowed disabled:opacity-60';
   const [y, m] = thang.split('-').map(Number);
 
+  // Nút lưu + thông báo đặt thêm ngay tại bảng Rewash (khỏi phải kéo lên đầu trang)
+  const rwSaveBar = (
+    <div className="flex flex-wrap items-center gap-3">
+      <button onClick={handleSave} disabled={!canEdit || saving || !inMonth}
+        className="flex items-center gap-1 rounded bg-[#141414] px-4 py-2 text-sm font-bold text-white hover:bg-slate-800 disabled:opacity-40">
+        {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Lưu số liệu ngày {fmtDateVN(ngay)}
+      </button>
+      {msg && (
+        <span className={`rounded px-3 py-1.5 text-xs font-medium ${msg.type === 'ok' ? 'bg-emerald-50 text-emerald-700' : msg.type === 'warn' ? 'bg-amber-50 text-amber-700' : 'bg-red-50 text-red-700'}`}>{msg.text}</span>
+      )}
+    </div>
+  );
+
   return (
     <div>
       <div className="mb-3 flex flex-wrap items-end gap-3 rounded border border-[#141414] bg-white p-3">
@@ -306,7 +319,10 @@ function DailyTab({ thang, catalog, dailyRows, summary, canEdit, onSaved }) {
       <p className="mt-2 text-[11px] text-slate-400">Nợ hiện tại = Nợ đầu kỳ + tổng Dơ − tổng Sạch của cả tháng (số đang nằm bên nhà giặt).</p>
 
       {/* ---------- BẢNG 2: REWASH DƠ / SẠCH ---------- */}
-      <h3 className="mb-1 mt-5 text-xs font-bold uppercase tracking-wider text-slate-600">Bảng Rewash (hàng giặt lại) — Dơ / Sạch</h3>
+      <div className="mb-2 mt-5 flex flex-wrap items-center justify-between gap-2">
+        <h3 className="text-xs font-bold uppercase tracking-wider text-slate-600">Bảng Rewash (hàng giặt lại) — Dơ / Sạch</h3>
+        {rwSaveBar}
+      </div>
       <div className="overflow-auto rounded border border-[#141414] bg-white">
         <table className="w-full border-collapse text-sm">
           <thead className="text-xs font-bold uppercase tracking-wide text-white">
@@ -337,6 +353,7 @@ function DailyTab({ thang, catalog, dailyRows, summary, canEdit, onSaved }) {
           </tbody>
         </table>
       </div>
+      <div className="mt-3">{rwSaveBar}</div>
       <p className="mt-2 text-[11px] text-slate-400">Nợ RW hiện tại = Nợ đầu kỳ RW + tổng RW Dơ − tổng RW Sạch (hàng giặt lại còn bên nhà giặt). Bấm "Lưu số liệu ngày" để lưu cả 2 bảng. RW không tính tiền và không làm đổi Nợ của bảng Dơ/Sạch.</p>
     </div>
   );
