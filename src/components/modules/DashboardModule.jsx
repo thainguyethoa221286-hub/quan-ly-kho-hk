@@ -53,6 +53,7 @@ const REPORTS = [
   },
   {
     key: 'PRPO',
+    hidden: true, // ẨN khỏi Report List (muốn mở lại: xoá dòng này)
     title: 'Đề Xuất Mua Hàng PR-PO',
     icon: ShoppingCart,
     pastel: 'bg-violet-50 border-violet-200',
@@ -397,7 +398,7 @@ export default function DashboardModule() {
       {/* ---- Report List ---- */}
       <h2 className="mb-2 text-xs font-mono font-bold uppercase tracking-wider text-slate-500 print:hidden">Report List</h2>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 print:hidden">
-        {REPORTS.map((report) => {
+        {REPORTS.filter((r) => !r.hidden).map((report) => {
           const Icon = report.icon;
           return (
             <div key={report.key} className={`rounded-xl border p-4 shadow-md transition-shadow duration-200 hover:shadow-lg ${report.pastel}`}>
