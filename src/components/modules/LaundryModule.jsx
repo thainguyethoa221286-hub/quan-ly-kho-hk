@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { Shirt, Download, Loader2, X, Save, FileUp, CheckCircle2, AlertTriangle, RefreshCw } from 'lucide-react';
+import { Shirt, Eye, Download, Loader2, X, Save, FileUp, CheckCircle2, AlertTriangle, RefreshCw } from 'lucide-react';
 import * as XLSX from 'xlsx-js-style';
 import { useStore } from '../../context/StoreContext';
 import DecimalInput from '../common/DecimalInput';
@@ -188,6 +188,95 @@ function SummaryTab({ thang, summary, dailyRows, canEdit, onMonthlyChange, onMon
 }
 
 // ====================================================================
+// XEM NHANH BẢNG KÊ CẢ THÁNG (cửa sổ nổi, không cần tải file)
+// ====================================================================
+function QuickView({ thang, items, dailyRows, onPickDay, onClose }) {
+  const [y, m] = thang.split('-').map(Number);
+  const dim = daysInMonth(thang);
+  const days = Array.from({ length: dim }, (_, i) => i + 1);
+  const weekday = (d) => ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'][new Date(y, m - 1, d).getDay()];
+
+  const dayMap = useMemo(() => {
+    const mp = {};
+    dailyRows.forEach((r) => {
+      const d = Number(String(r.ngay).slice(8, 10));
+      (mp[r.ten_hang] ||= {})[d] = { do: Number(r.do_sl) || 0, sach: Number(r.sach_sl) || 0, rw: Number(r.rw_sl) || 0, rws: Number(r.rw_sach_sl) || 0 };
+    });
+    return mp;
+  }, [dailyRows]);
+
+  const cell = (v) => (v ? fmtNumber(v) : '');
+  const base = 'border border-[#141414]/30 px-1.5 py-0.5 text-right text-[11px]';
+  const stickyName = 'sticky left-0 z-10 min-w-[120px] border border-[#141414]/30 bg-white px-2 py-0.5 text-left text-[11px] font-semibold';
+
+  const Head = ({ noLabel }) => (
+    <thead className="text-[10px] font-bold uppercase text-white">
+      <tr>
+        <th className="sticky left-0 z-20 border border-white/20 bg-slate-700 px-2 py-1 text-left" colSpan={2}>MẶT HÀNG</th>
+        <th className="border border-white/20 bg-slate-700 px-1.5 py-1">{noLabel}</th>
+        {days.map((d) => (
+          <th key={d} className="min-w-[30px] cursor-pointer border border-white/20 bg-slate-700 px-1 py-1 hover:bg-amber-600" title={`Mở ngày ${d} để nhập`} onClick={() => onPickDay(`${thang}-${pad2(d)}`)}>
+            <div className="font-normal opacity-80">{weekday(d)}</div>{d}
+          </th>
+        ))}
+        <th className="border border-white/20 bg-slate-700 px-1.5 py-1">TỔNG</th>
+        <th className="border border-white/20 bg-yellow-200 px-1.5 py-1 text-[#141414]">NỢ</th>
+      </tr>
+    </thead>
+  );
+
+  // kind: 'main' (Dơ/Sạch) hoặc 'rw' (Rewash Dơ/Sạch)
+  const Block = ({ kind }) => (
+    <table className="border-collapse">
+      <Head noLabel={kind === 'main' ? 'NỢ ĐK' : 'NỢ ĐK RW'} />
+      <tbody>
+        {items.map((r) => {
+          const dm = dayMap[r.TenHang] || {};
+          const kD = kind === 'main' ? 'do' : 'rw';
+          const kS = kind === 'main' ? 'sach' : 'rws';
+          const tD = kind === 'main' ? r.TongDo : r.RW;
+          const tS = kind === 'main' ? r.TongSach : r.RWSach;
+          const noDK = kind === 'main' ? r.NoDK : r.RWNoDK;
+          const no = kind === 'main' ? r.NoCuoi : r.RWNoCuoi;
+          return (
+            <React.Fragment key={r.TenHang}>
+              <tr>
+                <td rowSpan={2} className={stickyName}>{r.TenHang}</td>
+                <td className="border border-[#141414]/30 bg-red-50 px-1 text-center text-[10px] font-bold text-red-700">DƠ</td>
+                <td rowSpan={2} className={`${base} bg-yellow-50 font-semibold`}>{cell(noDK) || (noDK === 0 ? '0' : '')}</td>
+                {days.map((d) => <td key={d} className={`${base} bg-red-50/40`}>{cell(dm[d]?.[kD])}</td>)}
+                <td className={`${base} font-semibold`}>{fmtNumber(tD)}</td>
+                <td rowSpan={2} className={`${base} bg-yellow-100 font-bold ${no < 0 ? 'text-red-600' : ''}`}>{fmtNumber(no)}</td>
+              </tr>
+              <tr>
+                <td className="border border-[#141414]/30 bg-emerald-50 px-1 text-center text-[10px] font-bold text-emerald-700">SẠCH</td>
+                {days.map((d) => <td key={d} className={`${base} bg-emerald-50/40`}>{cell(dm[d]?.[kS])}</td>)}
+                <td className={`${base} font-semibold`}>{fmtNumber(tS)}</td>
+              </tr>
+            </React.Fragment>
+          );
+        })}
+      </tbody>
+    </table>
+  );
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-2" onClick={onClose}>
+      <div className="max-h-[94vh] w-full max-w-[98vw] overflow-auto rounded border border-[#141414] bg-white p-3 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <div className="sticky left-0 mb-2 flex items-center justify-between">
+          <h2 className="text-sm font-bold">XEM NHANH BẢNG KÊ GIẶT ỦI THÁNG {pad2(m)}/{y}</h2>
+          <button onClick={onClose} className="flex items-center gap-1 rounded border border-[#141414] px-3 py-1 text-xs font-bold hover:bg-[#E4E3E0]"><X className="h-3.5 w-3.5" /> Đóng</button>
+        </div>
+        <p className="mb-2 text-[11px] text-slate-500">Bấm vào số ngày ở đầu cột để mở đúng ngày đó nhập liệu. Ô trống = chưa có số liệu.</p>
+        <div className="overflow-x-auto"><Block kind="main" /></div>
+        <h3 className="mb-1 mt-4 text-xs font-bold uppercase text-slate-600">Bảng Rewash (hàng giặt lại)</h3>
+        <div className="overflow-x-auto"><Block kind="rw" /></div>
+      </div>
+    </div>
+  );
+}
+
+// ====================================================================
 // TAB 2 — NHẬP LIỆU DAILY LAUNDRY
 // ====================================================================
 function DailyTab({ thang, catalog, dailyRows, summary, canEdit, onSaved }) {
@@ -195,6 +284,7 @@ function DailyTab({ thang, catalog, dailyRows, summary, canEdit, onSaved }) {
   const [vals, setVals] = useState({});
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState(null);
+  const [showView, setShowView] = useState(false);
 
   // đổi tháng làm việc -> đưa ngày về trong tháng đó
   useEffect(() => { setNgay(defaultDay(thang)); }, [thang]);
@@ -271,7 +361,11 @@ function DailyTab({ thang, catalog, dailyRows, summary, canEdit, onSaved }) {
             className="rounded border border-slate-300 px-2 py-1.5 text-sm focus:outline-none" />
         </div>
         <p className="pb-2 text-sm font-bold">Ngày {fmtDateVN(ngay)}</p>
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ml-auto flex flex-wrap items-center gap-2">
+          <button onClick={() => setShowView(true)}
+            className="flex items-center gap-1 rounded border border-[#141414] bg-white px-3 py-2 text-sm font-bold hover:bg-[#E4E3E0]">
+            <Eye className="h-4 w-4" /> Xem nhanh báo cáo tháng
+          </button>
           <p className="text-xs text-slate-500">Tổng ngày: Dơ <strong>{fmtNumber(dayTotals.Do)}</strong> · Sạch <strong>{fmtNumber(dayTotals.Sach)}</strong> · RW Dơ <strong>{fmtNumber(dayTotals.RW)}</strong> · RW Sạch <strong>{fmtNumber(dayTotals.RWSach)}</strong></p>
           <button onClick={handleSave} disabled={!canEdit || saving || !inMonth}
             className="flex items-center gap-1 rounded bg-[#141414] px-4 py-2 text-sm font-bold text-white hover:bg-slate-800 disabled:opacity-40">
@@ -362,6 +456,10 @@ function DailyTab({ thang, catalog, dailyRows, summary, canEdit, onSaved }) {
         </table>
       </div>
       <div className="mt-3">{rwSaveBar}</div>
+      {showView && (
+        <QuickView thang={thang} items={summary.filter((r) => !isHiddenRow(r))} dailyRows={dailyRows}
+          onPickDay={(d) => { setNgay(d); setShowView(false); }} onClose={() => setShowView(false)} />
+      )}
       <p className="mt-2 text-[11px] text-slate-400">Nợ RW hiện tại = Nợ đầu kỳ RW + tổng RW Dơ − tổng RW Sạch (hàng giặt lại còn bên nhà giặt). Bấm "Lưu số liệu ngày" để lưu cả 2 bảng. RW không tính tiền và không làm đổi Nợ của bảng Dơ/Sạch.</p>
     </div>
   );
