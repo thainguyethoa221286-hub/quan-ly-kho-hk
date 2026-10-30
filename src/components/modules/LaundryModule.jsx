@@ -19,6 +19,11 @@ const TABS = [
   { id: 'RECON', label: 'ĐỐI SOÁT VỚI NHÀ GIẶT' },
 ];
 
+// Các loại linen khách sạn không dùng: chỉ ẨN khỏi màn hình nhập liệu/báo cáo để khỏi nhầm
+// (không xoá khỏi danh mục; file Excel xuất ra vẫn đầy đủ như mẫu).
+const HIDDEN_ITEMS = ['baomennho', 'drapnho'];
+const isHiddenRow = (r) => HIDDEN_ITEMS.includes(normLinenName(r.TenHang));
+
 const pad2 = (n) => String(n).padStart(2, '0');
 const daysInMonth = (thang) => {
   const [y, m] = thang.split('-').map(Number);
@@ -42,6 +47,7 @@ function SummaryTab({ thang, summary, dailyRows, canEdit, onMonthlyChange, onMon
     return { RWNoDK: sum('RWNoDK'), RWSach: sum('RWSach'), RWNoCuoi: sum('RWNoCuoi'), NoDK: sum('NoDK'), TongDo: sum('TongDo'), TongSach: sum('TongSach'), RW: sum('RW'), NoCuoi: sum('NoCuoi'), SlTinhTien: sum('SlTinhTien'), tien, vat, tong: tien + vat };
   }, [summary]);
 
+  const shownRows = useMemo(() => summary.filter((r) => !isHiddenRow(r)), [summary]);
   const [exporting, setExporting] = useState(false);
   const [exportMsg, setExportMsg] = useState(null);
 
@@ -88,9 +94,9 @@ function SummaryTab({ thang, summary, dailyRows, canEdit, onMonthlyChange, onMon
             </tr>
           </thead>
           <tbody>
-            {summary.map((r, idx) => (
+            {shownRows.map((r, idx) => (
               <tr key={r.TenHang} className={`hover:bg-amber-100 ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50'} ${savingKey === r.TenHang ? 'opacity-50' : ''}`}>
-                <td className="border border-[#141414]/30 px-2 py-1 text-center">{r.Stt}</td>
+                <td className="border border-[#141414]/30 px-2 py-1 text-center">{idx + 1}</td>
                 <td className="min-w-[160px] border border-[#141414]/30 px-2 py-1 font-medium">{r.TenHang}</td>
                 <td className="border border-[#141414]/30 px-2 py-1 text-center">{r.DVT}</td>
                 <td className="border border-[#141414]/30 bg-yellow-50 p-0">
@@ -151,9 +157,9 @@ function SummaryTab({ thang, summary, dailyRows, canEdit, onMonthlyChange, onMon
             </tr>
           </thead>
           <tbody>
-            {summary.map((r, idx) => (
+            {shownRows.map((r, idx) => (
               <tr key={r.TenHang} className={`hover:bg-amber-100 ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50'}`}>
-                <td className="border border-[#141414]/30 px-2 py-1 text-center">{r.Stt}</td>
+                <td className="border border-[#141414]/30 px-2 py-1 text-center">{idx + 1}</td>
                 <td className="min-w-[160px] border border-[#141414]/30 px-2 py-1 font-medium">{r.TenHang}</td>
                 <td className="border border-[#141414]/30 px-2 py-1 text-center">{r.DVT}</td>
                 <td className="border border-[#141414]/30 bg-yellow-50 p-0">
@@ -203,6 +209,8 @@ function DailyTab({ thang, catalog, dailyRows, summary, canEdit, onSaved }) {
 
   const inMonth = ngay.startsWith(thang);
   const daysEntered = useMemo(() => Array.from(new Set(dailyRows.map((r) => r.ngay))).sort(), [dailyRows]);
+  const hiddenNames = useMemo(() => new Set(summary.filter(isHiddenRow).map((r) => r.TenHang)), [summary]);
+  const shownCatalog = useMemo(() => catalog.filter((c) => !hiddenNames.has(c.TenHang)), [catalog, hiddenNames]);
   const noCuoiMap = useMemo(() => Object.fromEntries(summary.map((s) => [s.TenHang, s.NoCuoi])), [summary]);
 
   const setVal = (ten, field, value) => setVals((p) => ({ ...p, [ten]: { ...(p[ten] || {}), [field]: value } }));
@@ -299,7 +307,7 @@ function DailyTab({ thang, catalog, dailyRows, summary, canEdit, onSaved }) {
             </tr>
           </thead>
           <tbody>
-            {catalog.map((c, idx) => (
+            {shownCatalog.map((c, idx) => (
               <tr key={c.TenHang} className={idx % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
                 <td className="border border-[#141414]/30 px-2 py-1 text-center">{idx + 1}</td>
                 <td className="border border-[#141414]/30 px-2 py-1 font-medium">{c.TenHang}</td>
@@ -336,7 +344,7 @@ function DailyTab({ thang, catalog, dailyRows, summary, canEdit, onSaved }) {
             </tr>
           </thead>
           <tbody>
-            {catalog.map((c, idx) => (
+            {shownCatalog.map((c, idx) => (
               <tr key={c.TenHang} className={idx % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
                 <td className="border border-[#141414]/30 px-2 py-1 text-center">{idx + 1}</td>
                 <td className="border border-[#141414]/30 px-2 py-1 font-medium">{c.TenHang}</td>
