@@ -102,7 +102,7 @@ function SummaryTab({ thang, summary, dailyRows, canEdit, onMonthlyChange, onMon
                 <td className={tdNum}>{fmtNumber(r.TongSach)}</td>
                 <td className={`${tdNum} ${r.RWNoCuoi < 0 ? 'text-red-600' : ''}`} title="Nợ RW = Nợ đầu kỳ RW + RW Dơ − RW Sạch (hàng giặt lại còn bên nhà giặt), lấy từ bảng Rewash bên dưới.">{fmtNumber(r.RWNoCuoi)}</td>
                 <td className={`border border-[#141414] bg-yellow-100 px-2 py-1 text-right font-bold ${r.NoCuoi < 0 ? 'text-red-600' : ''}`}>{fmtNumber(r.NoCuoi)}</td>
-                <td className="border border-[#141414]/30 p-0" title={r.HeSo !== 1 ? `Để trống = tự tính: (Tổng Sạch − RW) × ${r.HeSo}` : 'Để trống = tự tính: Tổng Sạch − RW'}>
+                <td className="border border-[#141414]/30 p-0" title={r.HeSo !== 1 ? `Để trống = tự tính: Tổng Sạch × ${r.HeSo}` : 'Để trống = tự tính: Tổng Sạch (Rewash không tính tiền)'}>
                   <DecimalInput hideZero={false} value={r.SlOverride === null ? '' : r.SlOverride} disabled={!canEdit}
                     placeholder={String(r.SlAuto)}
                     onChange={(e) => onMonthlyChange(r.TenHang, 'sl_tinh_tien', e.target.value === '' ? null : e.target.value)}
@@ -176,7 +176,7 @@ function SummaryTab({ thang, summary, dailyRows, canEdit, onMonthlyChange, onMon
           </tbody>
         </table>
       </div>
-      <p className="mt-2 text-[11px] text-slate-400">Nợ RW cuối kỳ = Nợ đầu kỳ RW + RW Dơ − RW Sạch. Tổng RW Dơ được trừ vào số lượng tính tiền ở bảng trên (SL tính tiền = Sạch − RW).</p>
+      <p className="mt-2 text-[11px] text-slate-400">Nợ RW cuối kỳ = Nợ đầu kỳ RW + RW Dơ − RW Sạch. Rewash KHÔNG tính tiền và không ảnh hưởng số lượng tính tiền ở bảng trên (SL tính tiền = Sạch).</p>
     </div>
   );
 }
