@@ -5,6 +5,8 @@ import { useStore } from '../../context/StoreContext';
 // ⚠️ BẢN THỬ NGHIỆM (nhánh supabase-pilot): đọc/ghi qua Supabase.
 import { getVPPData, saveVPPItem, deleteVPPItem } from '../../services/supabaseVPPService';
 import { useConfirm } from '../common/useConfirm';
+import DecimalInput from '../common/DecimalInput';
+import { downloadStandardWorkbook } from '../../services/excelService';
 
 const fmtNumber = (v) => (Number(v) || 0).toLocaleString('vi-VN');
 const nextMonthStr = (thang) => {
@@ -32,7 +34,7 @@ function AddVPPItemModal({ onCancel, onConfirm }) {
     if (!tenHang || !dvt) return;
     setSaving(true);
     try {
-      await onConfirm({ tenHang, dvt, dauKy: Number(dauKy) || 0 });
+      await onConfirm({ tenHang, dvt, dauKy: parseFloat(String(dauKy).replace(',', '.')) || 0 });
     } finally {
       setSaving(false);
     }
@@ -147,38 +149,14 @@ export default function OfficeSuppliesModule() {
 
   const handleExportExcel = () => {
     const [y, m] = thang.split('-').map(Number);
-    const grey = 'D9D9D9';
-    const thin = { top: { style: 'thin', color: { rgb: 'CCCCCC' } }, bottom: { style: 'thin', color: { rgb: 'CCCCCC' } }, left: { style: 'thin', color: { rgb: 'CCCCCC' } }, right: { style: 'thin', color: { rgb: 'CCCCCC' } } };
-    const headers = ['STT', 'TÊN MẶT HÀNG', 'ĐVT', 'ĐẦU KỲ', 'NHẬP', 'CUỐI KỲ', 'SỬ DỤNG', 'GHI CHÚ'];
-    const aoa = [[`DANH SÁCH CÁC MẶT HÀNG VPP THÁNG ${String(m).padStart(2, '0')}/${y}`], [], headers];
-    const dataStart = aoa.length;
-    items.forEach((it) => {
-      aoa.push([it.Stt, it.TenHang, it.DVT, it.DauKy, it.Nhap, it.CuoiKy, it.SuDung, it.GhiChu]);
+    downloadStandardWorkbook({
+      sheetName: `VPP_${thang}`,
+      fileName: `VPP_${thang}.xlsx`,
+      title: `DANH SÁCH CÁC MẶT HÀNG VPP THÁNG ${String(m).padStart(2, '0')}/${y}`,
+      headers: ['STT', 'TÊN MẶT HÀNG', 'ĐVT', 'ĐẦU KỲ', 'NHẬP', 'CUỐI KỲ', 'SỬ DỤNG', 'GHI CHÚ'],
+      colTypes: ['center', 'text', 'center', 'num', 'num', 'num', 'num', 'text'],
+      rows: items.map((it) => [it.Stt, it.TenHang, it.DVT, Number(it.DauKy) || 0, Number(it.Nhap) || 0, Number(it.CuoiKy) || 0, Number(it.SuDung) || 0, it.GhiChu || '']),
     });
-    const dataEnd = aoa.length - 1;
-    const ws = XLSX.utils.aoa_to_sheet(aoa);
-    const lastCol = headers.length - 1;
-    ws['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: lastCol } }];
-    ws['!cols'] = [{ wch: 5 }, { wch: 32 }, { wch: 9 }, { wch: 10 }, { wch: 9 }, { wch: 10 }, { wch: 10 }, { wch: 22 }];
-
-    const setStyle = (r, c, style) => {
-      const ref = XLSX.utils.encode_cell({ r, c });
-      if (!ws[ref]) ws[ref] = { t: 's', v: '' };
-      ws[ref].s = { ...(ws[ref].s || {}), ...style };
-    };
-    setStyle(0, 0, { font: { bold: true, sz: 13, name: 'Times New Roman' }, alignment: { horizontal: 'center' } });
-    for (let c = 0; c <= lastCol; c++) {
-      setStyle(2, c, { font: { bold: true, sz: 10, name: 'Times New Roman' }, fill: { fgColor: { rgb: grey } }, alignment: { horizontal: 'center', vertical: 'center', wrapText: true }, border: thin });
-    }
-    for (let r = dataStart; r <= dataEnd; r++) {
-      for (let c = 0; c <= lastCol; c++) {
-        const isCentered = [0, 2, 3, 4, 5, 6].includes(c);
-        setStyle(r, c, { font: { sz: 10, name: 'Times New Roman' }, alignment: { horizontal: isCentered ? 'center' : 'left' }, border: thin });
-      }
-    }
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, `VPP_${thang}`);
-    XLSX.writeFile(wb, `VPP_${thang}.xlsx`);
   };
 
   return (
@@ -241,21 +219,21 @@ export default function OfficeSuppliesModule() {
                   <td className="border border-[#141414]/30 px-2 py-1">{it.DVT}</td>
 
                   <td className="border border-[#141414]/30 p-0">
-                    <input type="number" data-field="DauKy" value={Number(it.DauKy) === 0 ? '' : it.DauKy}
+                    <DecimalInput data-field="DauKy" value={it.DauKy}
                       onChange={(e) => handleFieldChange(it.rowIndex, 'DauKy', e.target.value)}
                       onKeyDown={(e) => gridKeyNav(e, 'DauKy')}
                       onBlur={() => persistRow(it.rowIndex)}
                       placeholder="0" className="w-16 bg-transparent px-2 py-1 text-right focus:bg-yellow-300 focus:outline-none" />
                   </td>
                   <td className="border border-[#141414]/30 p-0">
-                    <input type="number" data-field="Nhap" value={Number(it.Nhap) === 0 ? '' : it.Nhap}
+                    <DecimalInput data-field="Nhap" value={it.Nhap}
                       onChange={(e) => handleFieldChange(it.rowIndex, 'Nhap', e.target.value)}
                       onKeyDown={(e) => gridKeyNav(e, 'Nhap')}
                       onBlur={() => persistRow(it.rowIndex)}
                       placeholder="0" className="w-16 bg-transparent px-2 py-1 text-right focus:bg-yellow-300 focus:outline-none" />
                   </td>
                   <td className="border-2 border-[#141414] bg-yellow-100 p-0">
-                    <input type="number" data-field="CuoiKy" value={Number(it.CuoiKy) === 0 ? '' : it.CuoiKy}
+                    <DecimalInput data-field="CuoiKy" value={it.CuoiKy}
                       onChange={(e) => handleFieldChange(it.rowIndex, 'CuoiKy', e.target.value)}
                       onKeyDown={(e) => gridKeyNav(e, 'CuoiKy')}
                       onBlur={() => persistRow(it.rowIndex)}
