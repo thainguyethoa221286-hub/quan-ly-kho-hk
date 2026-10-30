@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { AlertTriangle, Plus, Download, Printer, Loader2, X, Trash2 } from 'lucide-react';
 import * as XLSX from 'xlsx-js-style';
+import { fmtDateVN } from '../../utils/dateFormat';
+import { downloadStandardWorkbook } from '../../services/excelService';
 import { useStore } from '../../context/StoreContext';
 // ⚠️ BẢN THỬ NGHIỆM (nhánh supabase-pilot): đọc/ghi qua Supabase.
 import {
@@ -24,14 +26,8 @@ const todayISO = () => {
   return `${y}-${m}-${day}`;
 };
 
-// Hiển thị ngày lưu dạng "YYYY-MM-DD" thành "DD/MM/YYYY" cho dễ đọc
-const fmtDateDisplay = (iso) => {
-  if (!iso) return '';
-  const parts = String(iso).split('-');
-  if (parts.length !== 3) return iso;
-  const [y, m, d] = parts;
-  return `${d}/${m}/${y}`;
-};
+// Hiển thị mọi dạng ngày thành chuẩn Việt Nam DD/MM/YYYY
+const fmtDateDisplay = (v) => fmtDateVN(v);
 
 // Cho phép gõ số tiền có dấu chấm HOẶC phẩy làm ngăn cách hàng nghìn
 // (VD: "10.000" hoặc "10,000" đều hiểu là 10000) — không dùng type="number"
@@ -293,7 +289,7 @@ export default function LossDamageModule() {
   };
 
   const handleDelete = async (rowIndex) => {
-    if (!(await confirm('Xoá dòng báo cáo này? Nếu đã đồng bộ sang Module 01, số lượng hư hỏng sẽ được trừ ngược lại.'))) return;
+    if (!(await confirm('Xoá dòng báo cáo này?'))) return;
     try {
       await deleteDamageItem(thang, rowIndex);
       setItems((prev) => prev.filter((it) => it.rowIndex !== rowIndex));
@@ -306,93 +302,24 @@ export default function LossDamageModule() {
   const handleExportExcel = () => {
     const [y, m] = thang.split('-').map(Number);
     const monthLabels = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
-    const grey = 'D9D9D9';
-    const yellow = 'FFD966';
-    const black = '141414';
-    const thinBorder = {
-      top: { style: 'thin', color: { rgb: 'CCCCCC' } },
-      bottom: { style: 'thin', color: { rgb: 'CCCCCC' } },
-      left: { style: 'thin', color: { rgb: 'CCCCCC' } },
-      right: { style: 'thin', color: { rgb: 'CCCCCC' } },
-    };
-    const headers = ['STT', 'NGÀY', 'ITEMS', 'QUANTITY', 'CHARGE', 'NO CHARGE', 'OFFER BY', 'NOTE'];
-
-    const aoa = [];
-    aoa.push([`Damage & Breakage   ${monthLabels[m - 1]}-${y}`]);
-    aoa.push([]);
-    aoa.push(headers);
-    const bannerRows = [];
-    const dataRowRange = [];
-
+    const rows = [];
     GROUPS.forEach((group) => {
       const groupItems = items.filter((it) => (it.Nhom || 'Khác') === group);
       if (groupItems.length === 0) return;
-      bannerRows.push(aoa.length);
-      aoa.push([group.toUpperCase()]);
-      const startRow = aoa.length;
+      rows.push({ banner: group.toUpperCase() });
       groupItems.forEach((it, idx) => {
-        aoa.push([idx + 1, fmtDateDisplay(it.Ngay), it.TenHang, it.SL, it.ThuKhach || '', it.FOCCost || '', it.NguoiBaoCao, it.GhiChu]);
-      });
-      dataRowRange.push([startRow, aoa.length - 1]);
-    });
-
-    const totalRowIdx = aoa.length;
-    aoa.push(['', '', 'TỔNG CỘNG', '', totals.sumCharge, totals.sumFOC, '', '']);
-
-    const ws = XLSX.utils.aoa_to_sheet(aoa);
-    const lastCol = headers.length - 1;
-    const merges = [{ s: { r: 0, c: 0 }, e: { r: 0, c: lastCol } }];
-    bannerRows.forEach((r) => merges.push({ s: { r, c: 0 }, e: { r, c: lastCol } }));
-    ws['!merges'] = merges;
-    ws['!cols'] = [{ wch: 5 }, { wch: 11 }, { wch: 30 }, { wch: 10 }, { wch: 12 }, { wch: 12 }, { wch: 18 }, { wch: 26 }];
-
-    const setStyle = (r, c, style) => {
-      const ref = XLSX.utils.encode_cell({ r, c });
-      if (!ws[ref]) ws[ref] = { t: 's', v: '' };
-      ws[ref].s = { ...(ws[ref].s || {}), ...style };
-    };
-
-    setStyle(0, 0, { font: { bold: true, sz: 13, name: 'Times New Roman' }, alignment: { horizontal: 'left' } });
-    for (let c = 0; c < headers.length; c++) {
-      setStyle(2, c, {
-        font: { bold: true, sz: 10, color: { rgb: black }, name: 'Times New Roman' },
-        fill: { fgColor: { rgb: grey } },
-        alignment: { horizontal: 'center', vertical: 'center', wrapText: true },
-        border: thinBorder,
-      });
-    }
-    bannerRows.forEach((r) => {
-      setStyle(r, 0, {
-        font: { bold: true, sz: 11, name: 'Times New Roman' },
-        fill: { fgColor: { rgb: yellow } },
-        alignment: { horizontal: 'left', vertical: 'center' },
+        rows.push([idx + 1, fmtDateDisplay(it.Ngay), it.TenHang, Number(it.SL) || 0, Number(it.ThuKhach) || 0, Number(it.FOCCost) || 0, it.NguoiBaoCao || '', it.GhiChu || '']);
       });
     });
-    dataRowRange.forEach(([start, end]) => {
-      for (let r = start; r <= end; r++) {
-        for (let c = 0; c < headers.length; c++) {
-          const isNum = [3, 4, 5].includes(c);
-          setStyle(r, c, {
-            font: { sz: 10, name: 'Times New Roman' },
-            alignment: { horizontal: isNum ? 'right' : 'left', vertical: 'center' },
-            border: thinBorder,
-            ...(c === 4 || c === 5 ? { numFmt: '#,##0' } : {}),
-          });
-        }
-      }
+    rows.push({ total: ['', '', 'TỔNG CỘNG', '', totals.sumCharge, totals.sumFOC, '', ''] });
+    downloadStandardWorkbook({
+      sheetName: `HuHong_${thang}`,
+      fileName: `Damage_Breakage_${thang}.xlsx`,
+      title: `Damage & Breakage ${monthLabels[m - 1]}-${y}`,
+      headers: ['STT', 'NGÀY', 'ITEMS', 'QUANTITY', 'CHARGE', 'NO CHARGE', 'OFFER BY', 'NOTE'],
+      colTypes: ['center', 'center', 'text', 'num', 'num', 'num', 'text', 'text'],
+      rows,
     });
-    for (let c = 0; c < headers.length; c++) {
-      setStyle(totalRowIdx, c, {
-        font: { bold: true, sz: 10, name: 'Times New Roman' },
-        fill: { fgColor: { rgb: 'F2F2F2' } },
-        border: thinBorder,
-        ...(c === 4 || c === 5 ? { numFmt: '#,##0' } : {}),
-      });
-    }
-
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, `HuHong_${thang}`);
-    XLSX.writeFile(wb, `Damage_Breakage_${thang}.xlsx`);
   };
 
   return (
@@ -417,7 +344,7 @@ export default function LossDamageModule() {
           </div>
           <div>
             <h1 className="text-lg font-bold text-[#141414]">BÁO CÁO HƯ HỎNG / FOC</h1>
-            <p className="text-xs text-slate-500">Quản lý đồ hư hỏng: đền bù (charge) và miễn phí khách sạn chịu (FOC). Tự động đồng bộ số dư vào Kho Module 01.</p>
+            <p className="text-xs text-slate-500">Quản lý đồ hư hỏng: đền bù (charge) và miễn phí khách sạn chịu (FOC)..</p>
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
