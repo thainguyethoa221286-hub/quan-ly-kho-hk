@@ -24,6 +24,42 @@ const TABS = [
 const HIDDEN_ITEMS = ['baomennho', 'drapnho'];
 const isHiddenRow = (r) => HIDDEN_ITEMS.includes(normLinenName(r.TenHang));
 
+/**
+ * Di chuyển giữa các ô nhập bằng bàn phím (như Excel):
+ *   ↓ / Enter = ô bên dưới, ↑ = ô bên trên, → / ← = ô bên cạnh (chỉ khi con trỏ đã ở mép số).
+ * Mỗi ô nhập có data-g (tên lưới), data-r (hàng), data-c (cột). Gắn onKeyDown={gridKeyNav} vào khung chứa.
+ */
+function gridKeyNav(e) {
+  const el = e.target;
+  if (!el || !el.dataset || el.dataset.g === undefined) return;
+  let dr = 0;
+  let dc = 0;
+  if (e.key === 'ArrowDown' || e.key === 'Enter') dr = 1;
+  else if (e.key === 'ArrowUp') dr = -1;
+  else if (e.key === 'ArrowRight') { if (el.selectionEnd !== el.value.length) return; dc = 1; }
+  else if (e.key === 'ArrowLeft') { if (el.selectionStart !== 0) return; dc = -1; }
+  else return;
+  e.preventDefault();
+  const g = el.dataset.g;
+  let r = Number(el.dataset.r);
+  let c = Number(el.dataset.c);
+  const root = e.currentTarget;
+  const find = (rr, cc) => root.querySelector(`[data-g="${g}"][data-r="${rr}"][data-c="${cc}"]`);
+  for (let step = 0; step < 120; step++) {
+    r += dr;
+    c += dc;
+    if (r < 0 || c < 0) return;
+    let t = find(r, c);
+    if (!t && dc !== 0) t = find(r - 1, c); // ô gộp 2 dòng (Nợ ĐK): thử dòng phía trên
+    if (t && !t.disabled) {
+      t.focus();
+      setTimeout(() => t.select(), 0); // chọn sẵn cả số để gõ đè ngay
+      return;
+    }
+    if (dc !== 0) return;
+  }
+}
+
 const pad2 = (n) => String(n).padStart(2, '0');
 const daysInMonth = (thang) => {
   const [y, m] = thang.split('-').map(Number);
@@ -268,13 +304,13 @@ function QuickView({ thang, items, dailyRows, canEdit, onPickDay, onSaved, onClo
   const stickyName = 'sticky left-0 z-10 min-w-[120px] border border-[#141414]/30 bg-white px-2 py-0.5 text-left text-[11px] font-semibold';
 
   // ô nhập số (hoặc chỉ hiện số nếu không có quyền sửa)
-  const renderInput = (ten, d, f, tone, extra = '') => {
+  const renderInput = (g, rr, ten, d, f, tone, extra = '') => {
     const changed = `${ten}|${d}|${f}` in edits;
     const val = getVal(ten, d, f);
     if (!canEdit) return <td className={`${base} ${tone} ${extra}`}>{cell(Number(val) || 0)}</td>;
     return (
       <td className={`border border-[#141414]/30 p-0 ${changed ? 'bg-yellow-200' : tone}`}>
-        <DecimalInput value={val} onChange={(e) => setEdit(ten, d, f, e.target.value)}
+        <DecimalInput data-g={g} data-r={rr} data-c={d} value={val} onChange={(e) => setEdit(ten, d, f, e.target.value)}
           className={`w-[34px] bg-transparent px-1 py-0.5 text-right text-[11px] focus:bg-yellow-200 focus:outline-none focus:ring-1 focus:ring-yellow-500 ${extra}`} />
       </td>
     );
@@ -298,6 +334,7 @@ function QuickView({ thang, items, dailyRows, canEdit, onPickDay, onSaved, onClo
 
   // kind: 'main' (Dơ/Sạch) hoặc 'rw' (Rewash Dơ/Sạch). Gọi như hàm (KHÔNG dùng như component) để ô nhập không mất con trỏ khi gõ.
   const renderBlock = (kind) => {
+    const g = kind === 'main' ? 'qm' : 'qr';
     const fD = kind === 'main' ? 'Do' : 'RW';
     const fS = kind === 'main' ? 'Sach' : 'RWSach';
     const noField = kind === 'main' ? 'NoDK' : 'RWNoDK';
@@ -305,7 +342,7 @@ function QuickView({ thang, items, dailyRows, canEdit, onPickDay, onSaved, onClo
       <table className="border-collapse">
         {renderHead(kind === 'main' ? 'NỢ ĐK' : 'NỢ ĐK RW')}
         <tbody>
-          {items.map((r) => {
+          {items.map((r, ii) => {
             const ten = r.TenHang;
             const tD = days.reduce((a, d) => a + numVal(ten, d, fD), 0);
             const tS = days.reduce((a, d) => a + numVal(ten, d, fS), 0);
@@ -319,17 +356,17 @@ function QuickView({ thang, items, dailyRows, canEdit, onPickDay, onSaved, onClo
                   <td className="border border-[#141414]/30 bg-red-50 px-1 text-center text-[10px] font-bold text-red-700">DƠ</td>
                   <td rowSpan={2} className={`border border-[#141414]/30 p-0 ${nk in edits ? 'bg-yellow-200' : 'bg-yellow-50'}`}>
                     {canEdit ? (
-                      <DecimalInput allowNegative value={noDK} onChange={(e) => setEdits((p) => ({ ...p, [nk]: e.target.value }))}
+                      <DecimalInput data-g={g} data-r={ii * 2} data-c={0} allowNegative value={noDK} onChange={(e) => setEdits((p) => ({ ...p, [nk]: e.target.value }))}
                         className="w-[44px] bg-transparent px-1 py-0.5 text-right text-[11px] font-semibold focus:bg-yellow-200 focus:outline-none focus:ring-1 focus:ring-yellow-500" />
                     ) : <span className="block px-1.5 text-right text-[11px] font-semibold">{fmtNumber(noDK)}</span>}
                   </td>
-                  {days.map((d) => <React.Fragment key={d}>{renderInput(ten, d, fD, 'bg-red-50/40', 'font-medium text-red-600')}</React.Fragment>)}
+                  {days.map((d) => <React.Fragment key={d}>{renderInput(g, ii * 2, ten, d, fD, 'bg-red-50/40', 'font-medium text-red-600')}</React.Fragment>)}
                   <td className={`${base} font-semibold text-red-600`}>{fmtNumber(tD)}</td>
                   <td rowSpan={2} className={`${base} bg-yellow-100 font-bold ${no < 0 ? 'text-red-600' : ''}`}>{fmtNumber(no)}</td>
                 </tr>
                 <tr>
                   <td className="border border-[#141414]/30 bg-emerald-50 px-1 text-center text-[10px] font-bold text-emerald-700">SẠCH</td>
-                  {days.map((d) => <React.Fragment key={d}>{renderInput(ten, d, fS, 'bg-emerald-50/40')}</React.Fragment>)}
+                  {days.map((d) => <React.Fragment key={d}>{renderInput(g, ii * 2 + 1, ten, d, fS, 'bg-emerald-50/40')}</React.Fragment>)}
                   <td className={`${base} font-semibold`}>{fmtNumber(tS)}</td>
                 </tr>
               </React.Fragment>
@@ -358,7 +395,7 @@ function QuickView({ thang, items, dailyRows, canEdit, onPickDay, onSaved, onClo
         </div>
         <p className="mb-2 text-[11px] text-slate-500">
           {canEdit ? 'Gõ trực tiếp vào ô để sửa/nhập (ô đã sửa có màu vàng), rồi bấm "Lưu thay đổi" — số tự đổ về đúng ngày và đúng loại linen. ' : ''}
-          Bấm vào số ngày ở đầu cột để mở ngày đó ở form nhập. Ô trống = chưa có số liệu.
+          Dùng phím mũi tên (↑ ↓ ← →) hoặc Enter để chuyển ô, không cần bấm chuột. Bấm vào số ngày ở đầu cột để mở ngày đó ở form nhập. Ô trống = chưa có số liệu.
         </p>
         <div className="overflow-x-auto">{renderBlock('main')}</div>
         <h3 className="mb-1 mt-4 text-xs font-bold uppercase text-slate-600">Bảng Rewash (hàng giặt lại)</h3>
@@ -445,7 +482,7 @@ function DailyTab({ thang, catalog, dailyRows, summary, canEdit, onSaved, onSave
   );
 
   return (
-    <div>
+    <div onKeyDown={gridKeyNav}>
       {/* ---------- THANH CÔNG CỤ: chọn ngày + xem nhanh + lưu (gom trong 1 card) ---------- */}
       <div className="mb-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
         <div className="flex flex-wrap items-end gap-x-4 gap-y-3">
@@ -491,6 +528,7 @@ function DailyTab({ thang, catalog, dailyRows, summary, canEdit, onSaved, onSave
             );
           })}
         </div>
+        <p className="mt-2 text-[11px] text-slate-400">Mẹo nhập nhanh: gõ số rồi nhấn <strong>Enter</strong> hoặc <strong>↓</strong> để xuống ô kế tiếp, <strong>→</strong> để sang ô bên phải (các phím mũi tên đều dùng được).</p>
         <p className="mt-2 flex items-center gap-1.5 text-[11px] text-slate-400">
           <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /> chấm xanh = ngày đã có số liệu
         </p>
@@ -515,10 +553,10 @@ function DailyTab({ thang, catalog, dailyRows, summary, canEdit, onSaved, onSave
                 <td className="border border-[#141414]/30 px-2 py-1 font-medium">{c.TenHang}</td>
                 <td className="border border-[#141414]/30 px-2 py-1 text-center">{c.DVT}</td>
                 <td className="border border-[#141414]/30 bg-red-50 px-2 py-1 text-right">
-                  <DecimalInput value={vals[c.TenHang]?.Do} onChange={(e) => setVal(c.TenHang, 'Do', e.target.value)} disabled={!canEdit || !inMonth} placeholder="0" className={inputCls} />
+                  <DecimalInput data-g="dm" data-r={idx} data-c={0} value={vals[c.TenHang]?.Do} onChange={(e) => setVal(c.TenHang, 'Do', e.target.value)} disabled={!canEdit || !inMonth} placeholder="0" className={inputCls} />
                 </td>
                 <td className="border border-[#141414]/30 bg-emerald-50 px-2 py-1 text-right">
-                  <DecimalInput value={vals[c.TenHang]?.Sach} onChange={(e) => setVal(c.TenHang, 'Sach', e.target.value)} disabled={!canEdit || !inMonth} placeholder="0" className={inputCls} />
+                  <DecimalInput data-g="dm" data-r={idx} data-c={1} value={vals[c.TenHang]?.Sach} onChange={(e) => setVal(c.TenHang, 'Sach', e.target.value)} disabled={!canEdit || !inMonth} placeholder="0" className={inputCls} />
                 </td>
                 <td className={`border border-[#141414]/30 px-2 py-1 text-right font-semibold ${(noCuoiMap[c.TenHang] || 0) < 0 ? 'text-red-600' : ''}`}>{fmtNumber(noCuoiMap[c.TenHang])}</td>
               </tr>
@@ -552,10 +590,10 @@ function DailyTab({ thang, catalog, dailyRows, summary, canEdit, onSaved, onSave
                 <td className="border border-[#141414]/30 px-2 py-1 font-medium">{c.TenHang}</td>
                 <td className="border border-[#141414]/30 px-2 py-1 text-center">{c.DVT}</td>
                 <td className="border border-[#141414]/30 bg-red-50 px-2 py-1 text-right">
-                  <DecimalInput value={vals[c.TenHang]?.RW} onChange={(e) => setVal(c.TenHang, 'RW', e.target.value)} disabled={!canEdit || !inMonth} placeholder="0" className={inputCls} />
+                  <DecimalInput data-g="dr" data-r={idx} data-c={0} value={vals[c.TenHang]?.RW} onChange={(e) => setVal(c.TenHang, 'RW', e.target.value)} disabled={!canEdit || !inMonth} placeholder="0" className={inputCls} />
                 </td>
                 <td className="border border-[#141414]/30 bg-emerald-50 px-2 py-1 text-right">
-                  <DecimalInput value={vals[c.TenHang]?.RWSach} onChange={(e) => setVal(c.TenHang, 'RWSach', e.target.value)} disabled={!canEdit || !inMonth} placeholder="0" className={inputCls} />
+                  <DecimalInput data-g="dr" data-r={idx} data-c={1} value={vals[c.TenHang]?.RWSach} onChange={(e) => setVal(c.TenHang, 'RWSach', e.target.value)} disabled={!canEdit || !inMonth} placeholder="0" className={inputCls} />
                 </td>
                 <td className={`border border-[#141414]/30 px-2 py-1 text-right font-semibold ${(rwNoMap[c.TenHang] || 0) < 0 ? 'text-red-600' : ''}`}>{fmtNumber(rwNoMap[c.TenHang])}</td>
               </tr>
