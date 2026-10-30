@@ -237,11 +237,10 @@ export async function buildLinenStatementBlob({ thang, summary, dailyRows }) {
       if (e) { tDo += e.do; tSach += e.sach; }
     }
 
-    const rw = s ? s.RW : 0;
     const noCuoi = (s ? s.NoDK : 0) + tDo - tSach;
     const override = s && s.SlOverride !== null && s.SlOverride !== undefined ? s.SlOverride : null;
     const factor = LINEN_FACTOR[key] || 1;
-    const tongGiat = override !== null ? override : (tSach - rw) * factor;
+    const tongGiat = override !== null ? override : tSach * factor; // Rewash không tính tiền
     const price = s ? s.DonGia : 0;
     const tien = tongGiat * price;
     sumTien += tien;
@@ -249,9 +248,9 @@ export async function buildLinenStatementBlob({ thang, summary, dailyRows }) {
     set(`AK${rDo}`, { f: `SUM(D${rDo}:AJ${rDo})`, v: tDo });
     set(`AK${rSach}`, { f: `SUM(D${rSach}:AJ${rSach})`, v: tSach });
     set(`AL${rDo}`, { f: `${rDo === FIRST_ROW ? `(C${rDo}+AK${rDo})` : `C${rDo}+AK${rDo}`}-AK${rSach}`, v: noCuoi });
-    set(`AM${rDo}`, rw ? rw : null);
+    set(`AM${rDo}`, null); // cột RW của bảng 1 để trống: Rewash nằm ở bảng thứ 2, không tính tiền
     if (override !== null) set(`AN${rDo}`, override);
-    else set(`AN${rDo}`, { f: factor !== 1 ? `(AK${rSach}-AM${rDo})*${factor}` : `AK${rSach}-AM${rDo}`, v: tongGiat });
+    else set(`AN${rDo}`, { f: factor !== 1 ? `AK${rSach}*${factor}` : `AK${rSach}-AM${rDo}`, v: tongGiat });
     set(`AO${rDo}`, price ? price : null);
     set(`AP${rDo}`, { f: `AO${rDo}*AN${rDo}`, v: tien });
   });
