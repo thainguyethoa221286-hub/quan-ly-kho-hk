@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { AlertTriangle, Plus, Download, Printer, Loader2, X, Trash2 } from 'lucide-react';
 import * as XLSX from 'xlsx-js-style';
 import { fmtDateVN } from '../../utils/dateFormat';
+import { findUnitPrice } from '../../utils/damagePricing';
 import { downloadStandardWorkbook } from '../../services/excelService';
 import { useStore } from '../../context/StoreContext';
 // ⚠️ BẢN THỬ NGHIỆM (nhánh supabase-pilot): đọc/ghi qua Supabase.
@@ -53,6 +54,22 @@ function AddDamageModal({ catalog, onCancel, onConfirm }) {
     GhiChu: '',
   });
   const [saving, setSaving] = useState(false);
+  // true khi nhân viên tự gõ số tiền -> không tự tính đè lên nữa
+  const [amountEdited, setAmountEdited] = useState(false);
+
+  const unitPrice = useMemo(() => findUnitPrice(form.TenHang), [form.TenHang]);
+
+  // Tự tính CHỈ khi chọn FOC (khách sạn chịu): Số tiền = Số lượng × Đơn giá.
+  // Với "Khách Đền Bù (Thu Tiền)" nhân viên tự nhập tay. FOC vẫn cho sửa tay sau khi tự tính.
+  const isFOC = form.HinhThuc === 'FOC';
+  useEffect(() => {
+    if (amountEdited) return;
+    if (isFOC && unitPrice && Number(form.SL) > 0) {
+      setForm((f) => ({ ...f, SoTien: fmtNumber(Math.round(unitPrice * Number(f.SL))) }));
+    } else {
+      setForm((f) => (f.SoTien === '' ? f : { ...f, SoTien: '' }));
+    }
+  }, [unitPrice, form.SL, amountEdited, isFOC]);
 
   const itemsInGroup = useMemo(
     () => catalog.filter((it) => it.Nhom === form.Nhom),
@@ -124,7 +141,7 @@ function AddDamageModal({ catalog, onCancel, onConfirm }) {
 
           <div>
             <label className="mb-1 block text-xs font-semibold text-slate-600">Số Lượng Hỏng</label>
-            <input type="number" min="1" value={form.SL} onChange={set('SL')} className="w-full rounded border border-slate-300 px-2 py-2 text-sm focus:outline-none" />
+            <input type="number" min="0" step="any" value={form.SL} onChange={set('SL')} className="w-full rounded border border-slate-300 px-2 py-2 text-sm focus:outline-none" />
           </div>
           <div>
             <label className="mb-1 block text-xs font-semibold text-slate-600">Ngày</label>
@@ -163,12 +180,22 @@ function AddDamageModal({ catalog, onCancel, onConfirm }) {
           </label>
           <input
             value={form.SoTien}
-            onChange={set('SoTien')}
+            onChange={(e) => { setAmountEdited(true); setForm((f) => ({ ...f, SoTien: e.target.value })); }}
             onBlur={() => setForm((f) => ({ ...f, SoTien: f.SoTien ? fmtNumber(parseAmount(f.SoTien)) : '' }))}
             placeholder="VD: 10.000 hoặc 10000"
             inputMode="numeric"
             className="w-full rounded border border-slate-300 px-2 py-2 text-sm focus:outline-none"
           />
+          {isFOC && unitPrice ? (
+            <p className="mt-1 text-[11px] text-emerald-700">
+              Đơn giá: <strong>{fmtNumber(unitPrice)} đ</strong> × {Number(form.SL) || 0} = <strong>{fmtNumber(Math.round(unitPrice * (Number(form.SL) || 0)))} đ</strong>
+              {amountEdited && (
+                <button type="button" onClick={() => setAmountEdited(false)} className="ml-2 font-semibold underline">Tính lại theo đơn giá</button>
+              )}
+            </p>
+            ) : isFOC && form.TenHang ? (
+            <p className="mt-1 text-[11px] text-amber-600">Item này chưa có trong bảng đơn giá — vui lòng nhập số tiền tay.</p>
+          ) : null}
           {form.SoTien !== '' && (
             <p className="mt-1 text-[11px] text-slate-400">
               Số tiền sẽ ghi nhận: <strong className="text-slate-600">{fmtNumber(parseAmount(form.SoTien))} đ</strong>
