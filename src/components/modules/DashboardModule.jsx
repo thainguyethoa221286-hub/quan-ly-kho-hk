@@ -11,6 +11,7 @@ import { getPRPOData } from '../../services/supabasePRPOService';
 import { getDamageData } from '../../services/supabaseDamageService';
 import { getMinibarSummary, rolloverMinibarMonth, getMinibarBills, getMinibarCatalog } from '../../services/supabaseMinibarService';
 import { getVPPData, rolloverVPPMonth } from '../../services/supabaseVPPService';
+import { rolloverLinenMonth } from '../../services/supabaseLinenService';
 import { appendMinibarDailySheet } from '../../services/minibarDailyMatrixSheet';
 import { buildStandardSheet, downloadStandardWorkbook, inferColType } from '../../services/excelService';
 import { fmtDateVN } from '../../utils/dateFormat';
@@ -29,6 +30,7 @@ const ROLLOVER_STEPS = [
   { key: 'STORE', label: 'Kho HK & Vật Tư', run: rolloverMonth },
   { key: 'MINIBAR', label: 'Minibar', run: rolloverMinibarMonth },
   { key: 'VPP', label: 'Văn Phòng Phẩm (VPP)', run: rolloverVPPMonth },
+  { key: 'LINEN', label: 'Hàng Linen (Nợ đầu kỳ)', run: rolloverLinenMonth },
 ];
 
 // ---------- Cấu hình 5 phân hệ báo cáo ----------
@@ -436,7 +438,7 @@ export default function DashboardModule() {
           <div className="w-[420px] rounded-lg bg-white p-5 shadow-xl">
             <h3 className="mb-2 text-base font-bold">Xác nhận kết chuyển tháng sau (tất cả)</h3>
             <p className="mb-3 text-sm text-slate-600">
-              Sẽ kết chuyển cùng lúc <strong>3 phân hệ</strong> từ tháng <strong>{thang}</strong> sang tháng{' '}
+              Sẽ kết chuyển cùng lúc <strong>{ROLLOVER_STEPS.length} phân hệ</strong> từ tháng <strong>{thang}</strong> sang tháng{' '}
               <strong>{nextMonthStr(thang)}</strong>:
             </p>
             <ul className="mb-4 space-y-1 text-sm">
@@ -463,7 +465,7 @@ export default function DashboardModule() {
             {rolloverBusy && (
               <p className="mb-3 flex items-center gap-2 rounded bg-amber-50 px-3 py-2 text-xs font-medium text-amber-700">
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                Đang kết chuyển, vui lòng đợi — có thể mất 1-2 phút cho cả 3 phân hệ...
+                Đang kết chuyển, vui lòng đợi — có thể mất 1-2 phút cho cả {ROLLOVER_STEPS.length} phân hệ...
               </p>
             )}
             {rolloverError && (
