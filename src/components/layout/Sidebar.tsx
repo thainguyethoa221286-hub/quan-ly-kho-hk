@@ -40,6 +40,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
     return () => { cancelled = true; };
   }, [selectedMonth]);
 
+  // Module đang ẨN khỏi menu (code + dữ liệu vẫn giữ nguyên). Muốn mở lại: xoá id khỏi danh sách này.
+  const HIDDEN_MODULES: ActiveModule[] = ['MODULE_02_PRPO'];
+
   const navItems = [
     {
       id: 'MODULE_01_STORE' as ActiveModule,
@@ -89,7 +92,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       icon: BarChart3,
       showWarning: false,
     }
-  ];
+  ].filter((it) => !HIDDEN_MODULES.includes(it.id));
 
   return (
     <aside className={`bg-[#F2F1EE] border-r border-[#141414] transition-all duration-300 flex flex-col justify-between shrink-0 print:hidden ${isCollapsed ? 'w-16' : 'w-72'}`}>
