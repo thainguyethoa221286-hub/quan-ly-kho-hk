@@ -12,6 +12,8 @@ import { getDamageData } from '../../services/supabaseDamageService';
 import { getMinibarSummary, rolloverMinibarMonth, getMinibarBills, getMinibarCatalog } from '../../services/supabaseMinibarService';
 import { getVPPData, rolloverVPPMonth } from '../../services/supabaseVPPService';
 import { appendMinibarDailySheet } from '../../services/minibarDailyMatrixSheet';
+import { buildStandardSheet, downloadStandardWorkbook, inferColType } from '../../services/excelService';
+import { fmtDateVN } from '../../utils/dateFormat';
 
 const fmtNumber = (v) => (Number(v) || 0).toLocaleString('vi-VN');
 
@@ -74,7 +76,7 @@ const REPORTS = [
     fetch: getDamageData,
     columns: [
       { key: 'Stt', label: 'STT' },
-      { key: 'Ngay', label: 'Ngày' },
+      { key: 'Ngay', label: 'Ngày', date: true },
       { key: 'TenHang', label: 'Item' },
       { key: 'ViTri', label: 'Vị trí' },
       { key: 'SL', label: 'SL', num: true },
@@ -169,7 +171,7 @@ function PreviewModal({ report, thang, autoPrint, onClose }) {
                   <tr key={idx}>
                     {report.columns.map((c) => (
                       <td key={c.key} className={`border border-slate-200 px-2 py-1 ${c.num ? 'text-right' : 'text-left'}`}>
-                        {c.num ? fmtNumber(r[c.key]) : r[c.key]}
+                        {c.num ? fmtNumber(r[c.key]) : c.date ? fmtDateVN(r[c.key]) : r[c.key]}
                       </td>
                     ))}
                   </tr>
@@ -183,29 +185,38 @@ function PreviewModal({ report, thang, autoPrint, onClose }) {
   );
 }
 
-// ---------- Xuất Excel đơn giản cho 1 phân hệ ----------
+// ---------- Xuất Excel cho 1 phân hệ (định dạng chuẩn kế toán, xem excelService.js) ----------
+/** Chuyển cấu hình 1 báo cáo + dữ liệu thành tuỳ chọn cho buildStandardSheet */
+function reportSheetOptions(report, rows, thang) {
+  const headers = report.columns.map((c) => c.label);
+  const colTypes = report.columns.map((c) => {
+    if (c.num) return 'num';
+    if (c.date) return 'center';
+    const t = inferColType(c.label);
+    return t === 'num' ? 'text' : t; // cột chữ không rõ loại -> căn trái
+  });
+  const body = rows.map((r) =>
+    report.columns.map((c) => {
+      if (c.num) return Number(r[c.key]) || 0;
+      if (c.date) return fmtDateVN(r[c.key]);
+      return r[c.key] ?? '';
+    })
+  );
+  return {
+    title: `M HOTEL — ${report.title} — THÁNG ${thang}`,
+    headers,
+    colTypes,
+    rows: body,
+  };
+}
+
 async function exportReportExcel(report, thang) {
   const rows = await report.fetch(thang);
-  const grey = 'D9D9D9';
-  const thin = { top: { style: 'thin', color: { rgb: 'CCCCCC' } }, bottom: { style: 'thin', color: { rgb: 'CCCCCC' } }, left: { style: 'thin', color: { rgb: 'CCCCCC' } }, right: { style: 'thin', color: { rgb: 'CCCCCC' } } };
-  const headers = report.columns.map((c) => c.label);
-  const aoa = [[`M HOTEL — ${report.title.toUpperCase()} — THÁNG ${thang}`], [], headers];
-  rows.forEach((r) => aoa.push(report.columns.map((c) => r[c.key])));
-  const ws = XLSX.utils.aoa_to_sheet(aoa);
-  const lastCol = headers.length - 1;
-  ws['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: lastCol } }];
-  ws['!cols'] = report.columns.map((c) => ({ wch: c.key === 'TenHang' ? 28 : 12 }));
-  const setStyle = (r, c, style) => {
-    const ref = XLSX.utils.encode_cell({ r, c });
-    if (!ws[ref]) ws[ref] = { t: 's', v: '' };
-    ws[ref].s = { ...(ws[ref].s || {}), ...style };
-  };
-  setStyle(0, 0, { font: { bold: true, sz: 13, name: 'Times New Roman' } });
-  for (let c = 0; c <= lastCol; c++) setStyle(2, c, { font: { bold: true, sz: 9, name: 'Times New Roman' }, fill: { fgColor: { rgb: grey } }, alignment: { horizontal: 'center', wrapText: true }, border: thin });
-  for (let r = 3; r < aoa.length; r++) for (let c = 0; c <= lastCol; c++) setStyle(r, c, { font: { sz: 9, name: 'Times New Roman' }, alignment: { horizontal: report.columns[c].num ? 'right' : 'left' }, border: thin });
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, report.key);
-  XLSX.writeFile(wb, `${report.title.replace(/\s+/g, '_')}_${thang}.xlsx`);
+  downloadStandardWorkbook({
+    sheetName: report.key,
+    fileName: `${report.title.replace(/\s+/g, '_')}_${thang}.xlsx`,
+    ...reportSheetOptions(report, rows, thang),
+  });
 }
 
 // ---------- Xuất Báo Cáo Tổng Của Tháng: gộp các phân hệ vào 1 file nhiều sheet ----------
@@ -218,28 +229,12 @@ const MASTER_WORKBOOK_EXCLUDED_KEYS = ['PRPO'];
 
 async function exportMasterWorkbook(thang) {
   const wb = XLSX.utils.book_new();
-  const grey = 'D9D9D9';
-  const thin = { top: { style: 'thin', color: { rgb: 'CCCCCC' } }, bottom: { style: 'thin', color: { rgb: 'CCCCCC' } }, left: { style: 'thin', color: { rgb: 'CCCCCC' } }, right: { style: 'thin', color: { rgb: 'CCCCCC' } } };
 
   for (const report of REPORTS) {
     if (MASTER_WORKBOOK_EXCLUDED_KEYS.includes(report.key)) continue;
 
     const rows = await report.fetch(thang);
-    const headers = report.columns.map((c) => c.label);
-    const aoa = [[`M HOTEL — ${report.title.toUpperCase()} — THÁNG ${thang}`], [], headers];
-    rows.forEach((r) => aoa.push(report.columns.map((c) => r[c.key])));
-    const ws = XLSX.utils.aoa_to_sheet(aoa);
-    const lastCol = headers.length - 1;
-    ws['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: lastCol } }];
-    ws['!cols'] = report.columns.map((c) => ({ wch: c.key === 'TenHang' ? 28 : 12 }));
-    const setStyle = (r, c, style) => {
-      const ref = XLSX.utils.encode_cell({ r, c });
-      if (!ws[ref]) ws[ref] = { t: 's', v: '' };
-      ws[ref].s = { ...(ws[ref].s || {}), ...style };
-    };
-    setStyle(0, 0, { font: { bold: true, sz: 13, name: 'Times New Roman' } });
-    for (let c = 0; c <= lastCol; c++) setStyle(2, c, { font: { bold: true, sz: 9, name: 'Times New Roman' }, fill: { fgColor: { rgb: grey } }, alignment: { horizontal: 'center', wrapText: true }, border: thin });
-    for (let r = 3; r < aoa.length; r++) for (let c = 0; c <= lastCol; c++) setStyle(r, c, { font: { sz: 9, name: 'Times New Roman' }, alignment: { horizontal: report.columns[c].num ? 'right' : 'left' }, border: thin });
+    const { ws } = buildStandardSheet(reportSheetOptions(report, rows, thang));
     XLSX.utils.book_append_sheet(wb, ws, report.key);
 
     // Ngay sau sheet "MINIBAR" (tổng hợp tháng) -> chèn thêm sheet "MINIBAR_DAILY"
