@@ -7,7 +7,7 @@
  *   - SẠCH = số lượng nhà giặt trả về trong ngày
  *   - NỢ ĐK = số hàng còn nằm bên nhà giặt (chưa trả) từ đầu tháng
  *   - NỢ CUỐI = NỢ ĐK + Σ DƠ − Σ SẠCH
- *   - SL TÍNH TIỀN (Tổng giặt) = Σ SẠCH − Σ RW (RW = giặt lại, nhập hằng ngày, không tính tiền),
+ *   - SL TÍNH TIỀN (Tổng giặt) = Σ SẠCH (Rewash là bảng riêng, KHÔNG tính tiền),
  *     có thể nhập tay đè lên (VD: Màn tính theo cách riêng)
  *   - THÀNH TIỀN = SL tính tiền × Đơn giá ;  + VAT 8%
  * ============================================================
@@ -140,7 +140,7 @@ export function computeLinenSummary(catalog, monthlyRows, dailyRows) {
     const noCuoi = noDK + d.do - d.sach;
     const slOverride = m.sl_tinh_tien === null || m.sl_tinh_tien === undefined ? null : Number(m.sl_tinh_tien);
     const factor = LINEN_FACTOR[normLinenName(c.TenHang)] || 1;
-    const slAuto = (d.sach - rw) * factor;
+    const slAuto = d.sach * factor; // Rewash không tính tiền
     const slTinhTien = slOverride !== null ? slOverride : slAuto;
     return {
       Stt: idx + 1, id: c.id, TenHang: c.TenHang, DVT: c.DVT, DonGia: c.DonGia,
