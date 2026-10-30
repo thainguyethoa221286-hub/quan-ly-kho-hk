@@ -17,6 +17,7 @@ import {
 } from '../../services/supabaseMinibarService';
 import { buildDailyBillsMatrix, appendMinibarDailySheet } from '../../services/minibarDailyMatrixSheet';
 import { useConfirm } from '../common/useConfirm';
+import { downloadStandardWorkbook } from '../../services/excelService';
 
 const FLOORS = ['F1', 'F2', 'F3', 'F4', 'F5', 'F6', 'F7', 'F8', 'F9'];
 // Thuế VAT 8% + Phụ phí phục vụ 5% áp vào Tổng Tiền (badge xanh lá) mỗi Bill ở
@@ -527,34 +528,15 @@ function SummaryTab({ thang, catalog, onReloadCatalog, refreshToken, isActive })
 
   const handleExportExcel = () => {
     const [y, m] = thang.split('-').map(Number);
-    const grey = 'D9D9D9';
-    const thin = { top: { style: 'thin', color: { rgb: 'CCCCCC' } }, bottom: { style: 'thin', color: { rgb: 'CCCCCC' } }, left: { style: 'thin', color: { rgb: 'CCCCCC' } }, right: { style: 'thin', color: { rgb: 'CCCCCC' } } };
-    const headers = ['STT', 'TÊN MẶT HÀNG', 'ĐVT', 'TỒN ĐẦU', 'NHẬP', 'BILLED', 'NO CHARGE', 'FOC', 'TRANS FO', 'TRANS FB', 'TỒN KHO MB', 'SETUP ROOM', 'TỒN TRÊN BÁO CÁO', 'TỒN THỰC TẾ', 'CHÊNH LỆCH'];
-    const aoa = [[`M HOTEL - BÁO CÁO TỔNG MINIBAR - THÁNG ${String(m).padStart(2, '0')}/${y}`], [], headers];
-    const dataStart = aoa.length;
-    items.forEach((it) => {
-      aoa.push([it.Stt, it.TenHang, it.DVT, it.TonDau, it.Nhap, it.Billed, it.NoCharge, it.FOC, it.TransferFO, it.TransferFB, it.TonKho, it.SetupRoom, it.TonSachVo, it.TonThucTe, it.ChenhLech]);
+    const n = (v) => Number(v) || 0;
+    downloadStandardWorkbook({
+      sheetName: `Minibar_${thang}`,
+      fileName: `Bao_Cao_Minibar_${thang}.xlsx`,
+      title: `M HOTEL - BÁO CÁO TỔNG MINIBAR - THÁNG ${String(m).padStart(2, '0')}/${y}`,
+      headers: ['STT', 'TÊN MẶT HÀNG', 'ĐVT', 'TỒN ĐẦU', 'NHẬP', 'BILLED', 'NO CHARGE', 'FOC', 'TRANS FO', 'TRANS FB', 'TỒN KHO MB', 'SETUP ROOM', 'TỒN TRÊN BÁO CÁO', 'TỒN THỰC TẾ', 'CHÊNH LỆCH'],
+      colTypes: ['center', 'text', 'center', ...Array(12).fill('num')],
+      rows: items.map((it) => [it.Stt, it.TenHang, it.DVT, n(it.TonDau), n(it.Nhap), n(it.Billed), n(it.NoCharge), n(it.FOC), n(it.TransferFO), n(it.TransferFB), n(it.TonKho), n(it.SetupRoom), n(it.TonSachVo), n(it.TonThucTe), n(it.ChenhLech)]),
     });
-    const dataEnd = aoa.length - 1;
-    const ws = XLSX.utils.aoa_to_sheet(aoa);
-    const lastCol = headers.length - 1;
-    ws['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: lastCol } }];
-    ws['!cols'] = headers.map((h, i) => ({ wch: i === 1 ? 28 : 11 }));
-    const setStyle = (r, c, style) => {
-      const ref = XLSX.utils.encode_cell({ r, c });
-      if (!ws[ref]) ws[ref] = { t: 's', v: '' };
-      ws[ref].s = { ...(ws[ref].s || {}), ...style };
-    };
-    setStyle(0, 0, { font: { bold: true, sz: 13, name: 'Times New Roman' } });
-    for (let c = 0; c <= lastCol; c++) setStyle(2, c, { font: { bold: true, sz: 9, name: 'Times New Roman' }, fill: { fgColor: { rgb: grey } }, alignment: { horizontal: 'center', vertical: 'center', wrapText: true }, border: thin });
-    for (let r = dataStart; r <= dataEnd; r++) {
-      for (let c = 0; c <= lastCol; c++) {
-        setStyle(r, c, { font: { sz: 9, name: 'Times New Roman' }, alignment: { horizontal: c >= 3 ? 'right' : 'left' }, border: thin });
-      }
-    }
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, `Minibar_${thang}`);
-    XLSX.writeFile(wb, `Bao_Cao_Minibar_${thang}.xlsx`);
   };
 
   return (
