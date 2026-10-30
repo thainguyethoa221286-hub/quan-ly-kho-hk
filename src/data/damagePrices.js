@@ -2,7 +2,8 @@
 // Bảng đơn giá dùng để TỰ TÍNH tiền trong Module 03 (Báo cáo Hư hỏng / FOC).
 // Nguồn: Budget_2027_control.xlsx (sheet "Theo Tháng").
 //  - Nhóm Amenities (hàng _HK trong file gốc): GIỮ NGUYÊN đơn giá gốc.
-//  - Các nhóm còn lại (hóa chất, đồ uống...): làm tròn gần nhất 500đ.
+//  - Các nhóm còn lại (hóa chất, đồ uống, CCDC...): làm tròn gần nhất 500đ.
+//  - Gồm cả sheet "Theo Quý" (khăn, ga, dụng cụ, đồ phòng...).
 // Muốn đổi đơn giá: sửa số ở cột `don_gia` bên dưới rồi commit.
 // ==================================================================
 export const DAMAGE_PRICES = [
@@ -56,4 +57,53 @@ export const DAMAGE_PRICES = [
   { ten: "Saigon special", don_gia: 13000, goc: 12840, amenities: false },
   { ten: "Tiger", don_gia: 14500, goc: 14316, amenities: false },
   { ten: "Evian 500ml", don_gia: 30000, goc: 30000, amenities: false },
+  { ten: "Duvet cover K 260*240 ( Vỏ mền King)", don_gia: 942000, goc: 942000, amenities: false },
+  { ten: "Sheet K 280*300 ( Ga giường King)", don_gia: 531000, goc: 531000, amenities: false },
+  { ten: "Khăn tắm", don_gia: 121000, goc: 121000, amenities: false },
+  { ten: "Khăn tay", don_gia: 28500, goc: 28600, amenities: false },
+  { ten: "Thảm chân", don_gia: 75000, goc: 75240, amenities: false },
+  { ten: "Khăn mặt", don_gia: 13000, goc: 13200, amenities: false },
+  { ten: "Miếng lau sàn thay thế 45cm", don_gia: 33000, goc: 33000, amenities: false },
+  { ten: "Miếng lau sàn thay thế 60cm", don_gia: 65000, goc: 65000, amenities: false },
+  { ten: "Cây cào nước", don_gia: 155000, goc: 155000, amenities: false },
+  { ten: "Miếng rửa chén bọt biển 02 lớp", don_gia: 16000, goc: 16215, amenities: false },
+  { ten: "Chổi lông gà", don_gia: 50000, goc: 50000, amenities: false },
+  { ten: "Bao tay rửa chén", don_gia: 23000, goc: 22817, amenities: false },
+  { ten: "Cây chà rãnh", don_gia: 26500, goc: 26666, amenities: false },
+  { ten: "Cây gạt kính cầm tay", don_gia: 115000, goc: 115000, amenities: false },
+  { ten: "Cây lau sàn 45cm", don_gia: 160000, goc: 160000, amenities: false },
+  { ten: "Bàn chải chà sàn toilet", don_gia: 30500, goc: 30704, amenities: false },
+  { ten: "Chổi cỏ", don_gia: 50000, goc: 50000, amenities: false },
+  { ten: "Cây cọ toilet", don_gia: 23000, goc: 22777, amenities: false },
+  { ten: "Đầu vải lau sàn nước PA", don_gia: 35000, goc: 35000, amenities: false },
+  { ten: "Mâm bàn chải đánh sàn cứng", don_gia: 700000, goc: 700000, amenities: false },
+  { ten: "Pad đánh sàn", don_gia: 82500, goc: 82400, amenities: false },
+  { ten: "Cát trắng ( kg)", don_gia: 10000, goc: 10000, amenities: false },
+  { ten: "Túi lọc bụi Karcher", don_gia: 49500, goc: 49377, amenities: false },
+  { ten: "Ly rock", don_gia: 52500, goc: 52500, amenities: false },
+  { ten: "Bình đun siêu tốc", don_gia: 800000, goc: 800000, amenities: false },
+  { ten: "Dép cao su đen", don_gia: 68500, goc: 68521, amenities: false },
+  { ten: "Dép tổ ong", don_gia: 60000, goc: 60012, amenities: false },
+  { ten: "Đầu vòi thay thế bình xịt hóa chất", don_gia: 25000, goc: 25000, amenities: false },
+  { ten: "Muỗng coffee 15cm", don_gia: 39000, goc: 38843, amenities: false },
+  { ten: "Menu noted pad bằng da", don_gia: 110000, goc: 110000, amenities: false },
+  { ten: "Khay khăn", don_gia: 200000, goc: 200000, amenities: false },
+  { ten: "Khay minibar", don_gia: 200000, goc: 200000, amenities: false },
+  { ten: "Khay amenities", don_gia: 200000, goc: 200000, amenities: false },
+  { ten: "Hộp khăn giấy", don_gia: 300000, goc: 300000, amenities: false },
+  { ten: "Kệ sách để bồn bathtub", don_gia: 500000, goc: 500000, amenities: false },
+  { ten: "Thùng rác inox trong phòng khách", don_gia: 300000, goc: 300000, amenities: false },
+  { ten: "Bộ bàn ghế bancony 777 & 888", don_gia: 3000000, goc: 3000000, amenities: false },
+  { ten: "Kệ khăn inox gấp gọn", don_gia: 400000, goc: 400000, amenities: false },
+  { ten: "Bao bì dép sử dụng 01 lần", don_gia: 70000, goc: 70000, amenities: false },
+  { ten: "Hộp đựng giấy vệ sinh inox", don_gia: 500000, goc: 500000, amenities: false },
+  { ten: "Máy sấy tóc", don_gia: 300000, goc: 300000, amenities: false },
+  { ten: "Móc quần áo", don_gia: 300000, goc: 300000, amenities: false },
+  { ten: "Bàn ủi set up phòng khách", don_gia: 300000, goc: 300000, amenities: false },
+  { ten: "Bàn để ủi", don_gia: 300000, goc: 300000, amenities: false },
+  { ten: "Kệ hành lý di động", don_gia: 700000, goc: 700000, amenities: false },
+  { ten: "Máy hút ẩm phòng khách", don_gia: 8000000, goc: 8000000, amenities: false },
+  { ten: "Bàn coffee 102, 210", don_gia: 5000000, goc: 5000000, amenities: false },
+  { ten: "Gạt tàn thuốc khu vực Lobby", don_gia: 300000, goc: 300000, amenities: false },
+  { ten: "Bìa lót tệp A4 set up cho phòng họp", don_gia: 160000, goc: 160000, amenities: false },
 ];
