@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Package, ShoppingCart, AlertTriangle, Coffee, FileText, 
-  BarChart3, ChevronLeft, ChevronRight
+  BarChart3, ChevronLeft, ChevronRight, Shirt
 } from 'lucide-react';
 import { useStore } from '../../context/StoreContext';
 // ⚠️ BẢN THỬ NGHIỆM (nhánh supabase-pilot): đọc/ghi qua Supabase.
 import { getMinibarSummary } from '../../services/supabaseMinibarService';
 
-export type ActiveModule = 'MODULE_01_STORE' | 'MODULE_02_PRPO' | 'MODULE_03_DAMAGE' | 'MODULE_04_MINIBAR' | 'MODULE_05_VPP' | 'MODULE_06_DASHBOARD';
+export type ActiveModule = 'MODULE_01_STORE' | 'MODULE_02_PRPO' | 'MODULE_03_DAMAGE' | 'MODULE_04_MINIBAR' | 'MODULE_05_VPP' | 'MODULE_06_DASHBOARD' | 'MODULE_07_LAUNDRY';
 
 interface SidebarProps {
   activeModule: ActiveModule;
@@ -90,6 +90,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
       title: 'Báo Cáo Tháng Tổng Hợp',
       subtitle: 'Dashboard KPI, xem nhanh & xuất Excel',
       icon: BarChart3,
+      showWarning: false,
+    },
+    {
+      id: 'MODULE_07_LAUNDRY' as ActiveModule,
+      num: '07',
+      title: 'Quản Lý Hàng Linen (Laundry)',
+      subtitle: 'Giao nhận giặt ủi & đối soát nhà giặt',
+      icon: Shirt,
       showWarning: false,
     }
   ].filter((it) => !HIDDEN_MODULES.includes(it.id));
