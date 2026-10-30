@@ -8,6 +8,7 @@ import LossDamageModule from './components/modules/LossDamageModule';
 import MinibarModule from './components/modules/MinibarModule';
 import OfficeSuppliesModule from './components/modules/OfficeSuppliesModule';
 import DashboardModule from './components/modules/DashboardModule';
+import LaundryModule from './components/modules/LaundryModule';
 import { Calendar, CheckCircle2 } from 'lucide-react';
 import { getMonthOptions, formatMonthLabel } from './utils/monthOptions';
 
@@ -117,6 +118,9 @@ function AppContent() {
             )}
             {visitedModules.MODULE_06_DASHBOARD && (
               <div className={activeModule === 'MODULE_06_DASHBOARD' ? '' : 'hidden'}><DashboardModule /></div>
+            )}
+            {visitedModules.MODULE_07_LAUNDRY && (
+              <div className={activeModule === 'MODULE_07_LAUNDRY' ? '' : 'hidden'}><LaundryModule /></div>
             )}
 
           </div>
