@@ -82,7 +82,7 @@ function SummaryTab({ thang, summary, dailyRows, canEdit, onMonthlyChange, onMon
         <table className="w-full border-collapse text-xs">
           <thead className="text-xs font-bold uppercase tracking-wide text-white">
             <tr>
-              {['STT', 'TÊN LOẠI LINEN', 'ĐVT', 'NỢ ĐẦU KỲ', 'GIAO GIẶT (DƠ)', 'NHẬN VỀ (SẠCH)', 'RW', 'NỢ CUỐI KỲ', 'SL TÍNH TIỀN', 'ĐƠN GIÁ', 'THÀNH TIỀN'].map((h, i) => (
+              {['STT', 'TÊN LOẠI LINEN', 'ĐVT', 'NỢ ĐẦU KỲ', 'GIAO GIẶT (DƠ)', 'NHẬN VỀ (SẠCH)', 'NỢ RW', 'NỢ CUỐI KỲ', 'SL TÍNH TIỀN', 'ĐƠN GIÁ', 'THÀNH TIỀN'].map((h, i) => (
                 <th key={h} className={`${th} ${i === 7 ? '!bg-yellow-200 !text-[#141414]' : ''}`}>{h}</th>
               ))}
             </tr>
@@ -100,7 +100,7 @@ function SummaryTab({ thang, summary, dailyRows, canEdit, onMonthlyChange, onMon
                 </td>
                 <td className={tdNum}>{fmtNumber(r.TongDo)}</td>
                 <td className={tdNum}>{fmtNumber(r.TongSach)}</td>
-                <td className={tdNum} title="Tổng RW DƠ (hàng gửi giặt lại) cả tháng, lấy từ bảng Rewash ở tab Nhập Liệu Daily. Số này được trừ khỏi SL tính tiền.">{fmtNumber(r.RW)}</td>
+                <td className={`${tdNum} ${r.RWNoCuoi < 0 ? 'text-red-600' : ''}`} title="Nợ RW = Nợ đầu kỳ RW + RW Dơ − RW Sạch (hàng giặt lại còn bên nhà giặt), lấy từ bảng Rewash bên dưới.">{fmtNumber(r.RWNoCuoi)}</td>
                 <td className={`border border-[#141414] bg-yellow-100 px-2 py-1 text-right font-bold ${r.NoCuoi < 0 ? 'text-red-600' : ''}`}>{fmtNumber(r.NoCuoi)}</td>
                 <td className="border border-[#141414]/30 p-0" title={r.HeSo !== 1 ? `Để trống = tự tính: (Tổng Sạch − RW) × ${r.HeSo}` : 'Để trống = tự tính: Tổng Sạch − RW'}>
                   <DecimalInput hideZero={false} value={r.SlOverride === null ? '' : r.SlOverride} disabled={!canEdit}
@@ -121,7 +121,7 @@ function SummaryTab({ thang, summary, dailyRows, canEdit, onMonthlyChange, onMon
               <td className={tdNum}>{fmtNumber(totals.NoDK)}</td>
               <td className={tdNum}>{fmtNumber(totals.TongDo)}</td>
               <td className={tdNum}>{fmtNumber(totals.TongSach)}</td>
-              <td className={tdNum}>{fmtNumber(totals.RW)}</td>
+              <td className={tdNum}>{fmtNumber(totals.RWNoCuoi)}</td>
               <td className={tdNum}>{fmtNumber(totals.NoCuoi)}</td>
               <td className={tdNum}>{fmtNumber(totals.SlTinhTien)}</td>
               <td className={tdNum}></td>
