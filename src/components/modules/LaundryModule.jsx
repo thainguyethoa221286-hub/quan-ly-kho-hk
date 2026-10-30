@@ -188,34 +188,105 @@ function SummaryTab({ thang, summary, dailyRows, canEdit, onMonthlyChange, onMon
 }
 
 // ====================================================================
-// XEM NHANH BẢNG KÊ CẢ THÁNG (cửa sổ nổi, không cần tải file)
+// XEM NHANH BẢNG KÊ CẢ THÁNG (cửa sổ nổi) — có thể gõ sửa trực tiếp vào ô
 // ====================================================================
-function QuickView({ thang, items, dailyRows, onPickDay, onClose }) {
+function QuickView({ thang, items, dailyRows, canEdit, onPickDay, onSaved, onClose }) {
   const [y, m] = thang.split('-').map(Number);
   const dim = daysInMonth(thang);
   const days = Array.from({ length: dim }, (_, i) => i + 1);
   const weekday = (d) => ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'][new Date(y, m - 1, d).getDay()];
 
+  // edits: { 'TÊN|ngày|field': 'chuỗi đang gõ' }  (field: Do/Sach/RW/RWSach)  và  { 'TÊN|nodk|NoDK|RWNoDK': ... }
+  const [edits, setEdits] = useState({});
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState(null);
+  const dirty = Object.keys(edits).length;
+
   const dayMap = useMemo(() => {
     const mp = {};
     dailyRows.forEach((r) => {
       const d = Number(String(r.ngay).slice(8, 10));
-      (mp[r.ten_hang] ||= {})[d] = { do: Number(r.do_sl) || 0, sach: Number(r.sach_sl) || 0, rw: Number(r.rw_sl) || 0, rws: Number(r.rw_sach_sl) || 0 };
+      (mp[r.ten_hang] ||= {})[d] = { Do: Number(r.do_sl) || 0, Sach: Number(r.sach_sl) || 0, RW: Number(r.rw_sl) || 0, RWSach: Number(r.rw_sach_sl) || 0 };
     });
     return mp;
   }, [dailyRows]);
+
+  const keyOf = (ten, d, f) => `${ten}|${d}|${f}`;
+  const baseVal = (ten, d, f) => dayMap[ten]?.[d]?.[f] || 0;
+  const getVal = (ten, d, f) => { const k = keyOf(ten, d, f); return k in edits ? edits[k] : baseVal(ten, d, f); };
+  const numVal = (ten, d, f) => Number(getVal(ten, d, f)) || 0;
+  const setEdit = (ten, d, f, v) => setEdits((p) => {
+    const k = keyOf(ten, d, f);
+    const next = { ...p };
+    if (String(v) === String(baseVal(ten, d, f) || '') || (v === '' && !baseVal(ten, d, f))) delete next[k];
+    else next[k] = v;
+    return next;
+  });
+
+  const handleSave = async () => {
+    setSaving(true);
+    setMsg(null);
+    try {
+      // gom theo (ngày) -> mỗi loại linen bị sửa
+      const perDay = {};
+      const monthlyEdits = {};
+      Object.entries(edits).forEach(([k, v]) => {
+        const [ten, d, f] = k.split('|');
+        if (d === 'nodk') { (monthlyEdits[ten] ||= {})[f] = v; return; }
+        ((perDay[d] ||= {})[ten] ||= true);
+      });
+      for (const [d, tens] of Object.entries(perDay)) {
+        const entries = Object.keys(tens).map((ten) => ({
+          TenHang: ten, Do: getVal(ten, d, 'Do'), Sach: getVal(ten, d, 'Sach'), RW: getVal(ten, d, 'RW'), RWSach: getVal(ten, d, 'RWSach'),
+        }));
+        await saveLinenDay(thang, `${thang}-${pad2(Number(d))}`, entries);
+      }
+      for (const [ten, f] of Object.entries(monthlyEdits)) {
+        await saveLinenMonthly(thang, ten, f);
+      }
+      await onSaved();
+      setEdits({});
+      setMsg({ type: 'ok', text: `Đã lưu ${dirty} ô thay đổi.` });
+    } catch (err) {
+      setMsg({ type: 'err', text: 'Lỗi khi lưu: ' + err.message });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const tryClose = () => {
+    if (dirty > 0 && !window.confirm(`Còn ${dirty} ô đã sửa nhưng CHƯA LƯU. Đóng và bỏ các thay đổi này?`)) return;
+    onClose();
+  };
+  const tryPick = (d) => {
+    if (dirty > 0 && !window.confirm(`Còn ${dirty} ô đã sửa nhưng CHƯA LƯU. Chuyển ngày và bỏ các thay đổi này?`)) return;
+    onPickDay(d);
+  };
 
   const cell = (v) => (v ? fmtNumber(v) : '');
   const base = 'border border-[#141414]/30 px-1.5 py-0.5 text-right text-[11px]';
   const stickyName = 'sticky left-0 z-10 min-w-[120px] border border-[#141414]/30 bg-white px-2 py-0.5 text-left text-[11px] font-semibold';
 
-  const Head = ({ noLabel }) => (
+  // ô nhập số (hoặc chỉ hiện số nếu không có quyền sửa)
+  const renderInput = (ten, d, f, tone, extra = '') => {
+    const changed = `${ten}|${d}|${f}` in edits;
+    const val = getVal(ten, d, f);
+    if (!canEdit) return <td className={`${base} ${tone} ${extra}`}>{cell(Number(val) || 0)}</td>;
+    return (
+      <td className={`border border-[#141414]/30 p-0 ${changed ? 'bg-yellow-200' : tone}`}>
+        <DecimalInput value={val} onChange={(e) => setEdit(ten, d, f, e.target.value)}
+          className={`w-[34px] bg-transparent px-1 py-0.5 text-right text-[11px] focus:bg-yellow-200 focus:outline-none focus:ring-1 focus:ring-yellow-500 ${extra}`} />
+      </td>
+    );
+  };
+
+  const renderHead = (noLabel) => (
     <thead className="text-[10px] font-bold uppercase text-white">
       <tr>
         <th className="sticky left-0 z-20 border border-white/20 bg-slate-700 px-2 py-1 text-left" colSpan={2}>MẶT HÀNG</th>
         <th className="border border-white/20 bg-slate-700 px-1.5 py-1">{noLabel}</th>
         {days.map((d) => (
-          <th key={d} className="min-w-[30px] cursor-pointer border border-white/20 bg-slate-700 px-1 py-1 hover:bg-amber-600" title={`Mở ngày ${d} để nhập`} onClick={() => onPickDay(`${thang}-${pad2(d)}`)}>
+          <th key={d} className="min-w-[34px] cursor-pointer border border-white/20 bg-slate-700 px-1 py-1 hover:bg-amber-600" title={`Mở ngày ${d} để nhập ở form`} onClick={() => tryPick(`${thang}-${pad2(d)}`)}>
             <div className="font-normal opacity-80">{weekday(d)}</div>{d}
           </th>
         ))}
@@ -225,52 +296,73 @@ function QuickView({ thang, items, dailyRows, onPickDay, onClose }) {
     </thead>
   );
 
-  // kind: 'main' (Dơ/Sạch) hoặc 'rw' (Rewash Dơ/Sạch)
-  const Block = ({ kind }) => (
-    <table className="border-collapse">
-      <Head noLabel={kind === 'main' ? 'NỢ ĐK' : 'NỢ ĐK RW'} />
-      <tbody>
-        {items.map((r) => {
-          const dm = dayMap[r.TenHang] || {};
-          const kD = kind === 'main' ? 'do' : 'rw';
-          const kS = kind === 'main' ? 'sach' : 'rws';
-          const tD = kind === 'main' ? r.TongDo : r.RW;
-          const tS = kind === 'main' ? r.TongSach : r.RWSach;
-          const noDK = kind === 'main' ? r.NoDK : r.RWNoDK;
-          const no = kind === 'main' ? r.NoCuoi : r.RWNoCuoi;
-          return (
-            <React.Fragment key={r.TenHang}>
-              <tr>
-                <td rowSpan={2} className={stickyName}>{r.TenHang}</td>
-                <td className="border border-[#141414]/30 bg-red-50 px-1 text-center text-[10px] font-bold text-red-700">DƠ</td>
-                <td rowSpan={2} className={`${base} bg-yellow-50 font-semibold`}>{cell(noDK) || (noDK === 0 ? '0' : '')}</td>
-                {days.map((d) => <td key={d} className={`${base} bg-red-50/40 font-medium text-red-600`}>{cell(dm[d]?.[kD])}</td>)}
-                <td className={`${base} font-semibold text-red-600`}>{fmtNumber(tD)}</td>
-                <td rowSpan={2} className={`${base} bg-yellow-100 font-bold ${no < 0 ? 'text-red-600' : ''}`}>{fmtNumber(no)}</td>
-              </tr>
-              <tr>
-                <td className="border border-[#141414]/30 bg-emerald-50 px-1 text-center text-[10px] font-bold text-emerald-700">SẠCH</td>
-                {days.map((d) => <td key={d} className={`${base} bg-emerald-50/40`}>{cell(dm[d]?.[kS])}</td>)}
-                <td className={`${base} font-semibold`}>{fmtNumber(tS)}</td>
-              </tr>
-            </React.Fragment>
-          );
-        })}
-      </tbody>
-    </table>
-  );
+  // kind: 'main' (Dơ/Sạch) hoặc 'rw' (Rewash Dơ/Sạch). Gọi như hàm (KHÔNG dùng như component) để ô nhập không mất con trỏ khi gõ.
+  const renderBlock = (kind) => {
+    const fD = kind === 'main' ? 'Do' : 'RW';
+    const fS = kind === 'main' ? 'Sach' : 'RWSach';
+    const noField = kind === 'main' ? 'NoDK' : 'RWNoDK';
+    return (
+      <table className="border-collapse">
+        {renderHead(kind === 'main' ? 'NỢ ĐK' : 'NỢ ĐK RW')}
+        <tbody>
+          {items.map((r) => {
+            const ten = r.TenHang;
+            const tD = days.reduce((a, d) => a + numVal(ten, d, fD), 0);
+            const tS = days.reduce((a, d) => a + numVal(ten, d, fS), 0);
+            const nk = `${ten}|nodk|${noField}`;
+            const noDK = nk in edits ? edits[nk] : (kind === 'main' ? r.NoDK : r.RWNoDK);
+            const no = (Number(noDK) || 0) + tD - tS;
+            return (
+              <React.Fragment key={ten}>
+                <tr>
+                  <td rowSpan={2} className={stickyName}>{ten}</td>
+                  <td className="border border-[#141414]/30 bg-red-50 px-1 text-center text-[10px] font-bold text-red-700">DƠ</td>
+                  <td rowSpan={2} className={`border border-[#141414]/30 p-0 ${nk in edits ? 'bg-yellow-200' : 'bg-yellow-50'}`}>
+                    {canEdit ? (
+                      <DecimalInput allowNegative value={noDK} onChange={(e) => setEdits((p) => ({ ...p, [nk]: e.target.value }))}
+                        className="w-[44px] bg-transparent px-1 py-0.5 text-right text-[11px] font-semibold focus:bg-yellow-200 focus:outline-none focus:ring-1 focus:ring-yellow-500" />
+                    ) : <span className="block px-1.5 text-right text-[11px] font-semibold">{fmtNumber(noDK)}</span>}
+                  </td>
+                  {days.map((d) => <React.Fragment key={d}>{renderInput(ten, d, fD, 'bg-red-50/40', 'font-medium text-red-600')}</React.Fragment>)}
+                  <td className={`${base} font-semibold text-red-600`}>{fmtNumber(tD)}</td>
+                  <td rowSpan={2} className={`${base} bg-yellow-100 font-bold ${no < 0 ? 'text-red-600' : ''}`}>{fmtNumber(no)}</td>
+                </tr>
+                <tr>
+                  <td className="border border-[#141414]/30 bg-emerald-50 px-1 text-center text-[10px] font-bold text-emerald-700">SẠCH</td>
+                  {days.map((d) => <React.Fragment key={d}>{renderInput(ten, d, fS, 'bg-emerald-50/40')}</React.Fragment>)}
+                  <td className={`${base} font-semibold`}>{fmtNumber(tS)}</td>
+                </tr>
+              </React.Fragment>
+            );
+          })}
+        </tbody>
+      </table>
+    );
+  };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-2" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-2" onClick={tryClose}>
       <div className="max-h-[94vh] w-full max-w-[98vw] overflow-auto rounded border border-[#141414] bg-white p-3 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-        <div className="sticky left-0 mb-2 flex items-center justify-between">
+        <div className="sticky left-0 mb-2 flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-sm font-bold">XEM NHANH BẢNG KÊ GIẶT ỦI THÁNG {pad2(m)}/{y}</h2>
-          <button onClick={onClose} className="flex items-center gap-1 rounded border border-[#141414] px-3 py-1 text-xs font-bold hover:bg-[#E4E3E0]"><X className="h-3.5 w-3.5" /> Đóng</button>
+          <div className="flex flex-wrap items-center gap-2">
+            {msg && <span className={`rounded-lg px-3 py-1 text-xs font-medium ${msg.type === 'ok' ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>{msg.text}</span>}
+            {canEdit && (
+              <button onClick={handleSave} disabled={saving || dirty === 0}
+                className="flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-1.5 text-xs font-bold text-white shadow-md transition-all hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-40">
+                {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />} Lưu thay đổi{dirty > 0 ? ` (${dirty} ô)` : ''}
+              </button>
+            )}
+            <button onClick={tryClose} className="flex items-center gap-1 rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-bold hover:bg-[#E4E3E0]"><X className="h-3.5 w-3.5" /> Đóng</button>
+          </div>
         </div>
-        <p className="mb-2 text-[11px] text-slate-500">Bấm vào số ngày ở đầu cột để mở đúng ngày đó nhập liệu. Ô trống = chưa có số liệu.</p>
-        <div className="overflow-x-auto"><Block kind="main" /></div>
+        <p className="mb-2 text-[11px] text-slate-500">
+          {canEdit ? 'Gõ trực tiếp vào ô để sửa/nhập (ô đã sửa có màu vàng), rồi bấm "Lưu thay đổi" — số tự đổ về đúng ngày và đúng loại linen. ' : ''}
+          Bấm vào số ngày ở đầu cột để mở ngày đó ở form nhập. Ô trống = chưa có số liệu.
+        </p>
+        <div className="overflow-x-auto">{renderBlock('main')}</div>
         <h3 className="mb-1 mt-4 text-xs font-bold uppercase text-slate-600">Bảng Rewash (hàng giặt lại)</h3>
-        <div className="overflow-x-auto"><Block kind="rw" /></div>
+        <div className="overflow-x-auto">{renderBlock('rw')}</div>
       </div>
     </div>
   );
@@ -279,7 +371,7 @@ function QuickView({ thang, items, dailyRows, onPickDay, onClose }) {
 // ====================================================================
 // TAB 2 — NHẬP LIỆU DAILY LAUNDRY
 // ====================================================================
-function DailyTab({ thang, catalog, dailyRows, summary, canEdit, onSaved }) {
+function DailyTab({ thang, catalog, dailyRows, summary, canEdit, onSaved, onSavedAll }) {
   const [ngay, setNgay] = useState(() => defaultDay(thang));
   const [vals, setVals] = useState({});
   const [saving, setSaving] = useState(false);
@@ -473,10 +565,9 @@ function DailyTab({ thang, catalog, dailyRows, summary, canEdit, onSaved }) {
       </div>
       <div className="mt-3">{rwSaveBar}</div>
       {showView && (
-        <QuickView thang={thang} items={summary.filter((r) => !isHiddenRow(r))} dailyRows={dailyRows}
-          onPickDay={(d) => { setNgay(d); setShowView(false); }} onClose={() => setShowView(false)} />
+        <QuickView thang={thang} items={summary.filter((r) => !isHiddenRow(r))} dailyRows={dailyRows} canEdit={canEdit}
+          onPickDay={(d) => { setNgay(d); setShowView(false); }} onSaved={onSavedAll} onClose={() => setShowView(false)} />
       )}
-      <p className="mt-2 text-[11px] text-slate-400">Nợ RW hiện tại = Nợ đầu kỳ RW + tổng RW Dơ − tổng RW Sạch (hàng giặt lại còn bên nhà giặt). Bấm "Lưu số liệu ngày" để lưu cả 2 bảng. RW không tính tiền và không làm đổi Nợ của bảng Dơ/Sạch.</p>
     </div>
   );
 }
@@ -722,6 +813,12 @@ export default function LaundryModule() {
   };
 
   const reloadDaily = async () => setDaily(await getLinenDaily(thang));
+  // tải lại nhẹ (không hiện vòng xoay) cả số liệu tháng + ngày — dùng sau khi lưu từ cửa sổ Xem nhanh
+  const reloadAll = async () => {
+    const [mo, d] = await Promise.all([getLinenMonthly(thang), getLinenDaily(thang)]);
+    setMonthly(mo);
+    setDaily(d);
+  };
 
   return (
     <div>
@@ -761,7 +858,7 @@ export default function LaundryModule() {
           onMonthlyChange={handleMonthlyChange} onMonthlySave={handleMonthlySave}
           onPriceChange={handlePriceChange} onPriceSave={handlePriceSave} />
       ) : tab === 'DAILY' ? (
-        <DailyTab thang={thang} catalog={catalog} dailyRows={daily} summary={summary} canEdit={canEdit} onSaved={reloadDaily} />
+        <DailyTab thang={thang} catalog={catalog} dailyRows={daily} summary={summary} canEdit={canEdit} onSaved={reloadDaily} onSavedAll={reloadAll} />
       ) : (
         <ReconTab thang={thang} catalog={catalog} summary={summary} />
       )}
