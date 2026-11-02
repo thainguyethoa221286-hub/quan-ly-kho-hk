@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { Search, Plus, Trash2, Download, Printer, RefreshCw, Loader2, X, Eye, EyeOff, AlertTriangle } from 'lucide-react';
+import { Search, Plus, Trash2, Download, Printer, RefreshCw, Loader2, X, Eye, EyeOff, AlertTriangle, Save } from 'lucide-react';
 import * as XLSX from 'xlsx-js-style';
 import { useStore } from '../../context/StoreContext';
 import DecimalInput from '../common/DecimalInput';
@@ -194,6 +194,9 @@ export default function StoreModule() {
   // gửi lại đúng các dòng đó mà không cần gõ lại từ đầu, và (3) cảnh báo
   // trước khi rời/tải lại trang để tránh mất dữ liệu đã gõ nhưng chưa lưu.
   const [failedRows, setFailedRows] = useState({});
+  // Dòng đã sửa trên màn hình nhưng CHƯA bấm Lưu (không tự lưu nữa để tránh lưu nhầm)
+  const [dirtyRows, setDirtyRows] = useState({});
+  const [savingAll, setSavingAll] = useState(false);
 
   /**
    * Điều hướng bằng phím khi đang nhập liệu trong lưới:
@@ -223,6 +226,8 @@ export default function StoreModule() {
     try {
       const data = await getKhoData(month);
       setItems(data.map(computeDerived));
+      setDirtyRows({});
+      setFailedRows({});
     } catch (err) {
       setError(err.message);
     } finally {
@@ -260,6 +265,7 @@ export default function StoreModule() {
 
   // ---- Inline edit handlers ----
   const handleFieldChange = (rowIndex, field, value) => {
+    setDirtyRows((d) => (d[rowIndex] ? d : { ...d, [rowIndex]: true }));
     setItems((prev) =>
       prev.map((it) => (it.rowIndex === rowIndex ? computeDerived({ ...it, [field]: value }) : it))
     );
@@ -272,6 +278,7 @@ export default function StoreModule() {
     try {
       const saved = await saveKhoItem(thang, item);
       setItems((prev) => prev.map((it) => (it.rowIndex === rowIndex ? { ...it, ...saved } : it)));
+      setDirtyRows((d) => { if (!d[rowIndex]) return d; const c = { ...d }; delete c[rowIndex]; return c; });
       setFailedRows((s) => {
         if (!s[rowIndex]) return s;
         const copy = { ...s };
@@ -294,6 +301,23 @@ export default function StoreModule() {
   };
 
   const failedRowIndexes = Object.keys(failedRows).map(Number);
+  const dirtyIndexes = Object.keys(dirtyRows).map(Number);
+
+  // Bấm "Lưu thay đổi": lưu tất cả các dòng đã sửa
+  const handleSaveAll = async () => {
+    setError(null);
+    setSavingAll(true);
+    for (const rowIndex of dirtyIndexes) {
+      // eslint-disable-next-line no-await-in-loop
+      await handleFieldBlur(rowIndex);
+    }
+    setSavingAll(false);
+  };
+
+  const handleDiscard = () => {
+    if (!window.confirm(`Bỏ ${dirtyIndexes.length} dòng đã sửa và quay về số liệu đã lưu?`)) return;
+    loadData(thang);
+  };
 
   const handleRetryFailedRows = async () => {
     setError(null);
@@ -308,13 +332,13 @@ export default function StoreModule() {
   // lại từ Google Sheets và ghi đè mất phần chưa lưu, nên phải chặn trước.
   useEffect(() => {
     const handler = (e) => {
-      if (failedRowIndexes.length === 0) return;
+      if (failedRowIndexes.length === 0 && dirtyIndexes.length === 0) return;
       e.preventDefault();
       e.returnValue = '';
     };
     window.addEventListener('beforeunload', handler);
     return () => window.removeEventListener('beforeunload', handler);
-  }, [failedRowIndexes.length]);
+  }, [failedRowIndexes.length, dirtyIndexes.length]);
 
   const handleDelete = async (rowIndex) => {
     try {
@@ -436,6 +460,23 @@ export default function StoreModule() {
               🔒 Chế độ Chỉ Xem — không thể chỉnh sửa
             </span>
           )}
+          {canEdit && dirtyIndexes.length > 0 && (
+            <>
+              <span className="rounded border border-amber-400 bg-amber-50 px-2 py-1.5 text-xs font-medium text-amber-700">
+                Có {dirtyIndexes.length} dòng đã sửa, CHƯA lưu
+              </span>
+              <button onClick={handleDiscard} disabled={savingAll}
+                className="flex items-center gap-1 rounded border border-slate-400 bg-white px-3 py-1.5 text-xs font-bold hover:bg-slate-100 disabled:opacity-50">
+                <X className="h-3.5 w-3.5" /> Hủy thay đổi
+              </button>
+            </>
+          )}
+          {canEdit && (
+            <button onClick={handleSaveAll} disabled={savingAll || dirtyIndexes.length === 0}
+              className="flex items-center gap-1 rounded bg-emerald-600 px-4 py-1.5 text-xs font-bold text-white shadow hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-40">
+              {savingAll ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />} Lưu thay đổi{dirtyIndexes.length > 0 ? ` (${dirtyIndexes.length})` : ''}
+            </button>
+          )}
           {canEdit && (
             <button
               onClick={() => setShowAddRow(true)}
@@ -537,6 +578,7 @@ export default function StoreModule() {
                   className={`transition-colors hover:bg-amber-100 ${
                     failedRows[it.rowIndex]
                       ? 'bg-red-50 outline outline-2 -outline-offset-2 outline-red-400'
+                      : dirtyRows[it.rowIndex] ? 'bg-amber-50 outline outline-1 -outline-offset-1 outline-amber-400'
                       : savingRows[it.rowIndex] ? 'opacity-50' : idx % 2 === 0 ? 'bg-white' : 'bg-slate-50'
                   }`}
                 >
@@ -561,7 +603,7 @@ export default function StoreModule() {
                       onChange={(e) => handleFieldChange(it.rowIndex, 'SetUp', e.target.value)}
                       onFocus={() => setFocusedRow(it.rowIndex)}
                       onKeyDown={(e) => handleGridKeyDown(e, 'SetUp')}
-                      onBlur={() => { handleFieldBlur(it.rowIndex); setFocusedRow(null); }}
+                      onBlur={() => setFocusedRow(null)}
                       disabled={!canEdit}
                       className="w-16 bg-transparent px-2 py-1 text-right focus:bg-yellow-300 focus:outline-none focus:ring-2 focus:ring-yellow-500 disabled:cursor-not-allowed disabled:opacity-60"
                     />
@@ -575,7 +617,7 @@ export default function StoreModule() {
                       onChange={(e) => handleFieldChange(it.rowIndex, 'Nhap', e.target.value)}
                       onFocus={() => setFocusedRow(it.rowIndex)}
                       onKeyDown={(e) => handleGridKeyDown(e, 'Nhap')}
-                      onBlur={() => { handleFieldBlur(it.rowIndex); setFocusedRow(null); }}
+                      onBlur={() => setFocusedRow(null)}
                       disabled={!canEdit}
                       className="w-16 bg-transparent px-2 py-1 text-right focus:bg-yellow-300 focus:outline-none focus:ring-2 focus:ring-yellow-500 disabled:cursor-not-allowed disabled:opacity-60"
                     />
@@ -591,7 +633,7 @@ export default function StoreModule() {
                       onChange={(e) => handleFieldChange(it.rowIndex, 'Ton', e.target.value)}
                       onFocus={() => setFocusedRow(it.rowIndex)}
                       onKeyDown={(e) => handleGridKeyDown(e, 'Ton')}
-                      onBlur={() => { handleFieldBlur(it.rowIndex); setFocusedRow(null); }}
+                      onBlur={() => setFocusedRow(null)}
                       disabled={!canEdit}
                       className="w-16 bg-transparent px-2 py-1 text-right font-semibold text-red-600 focus:bg-yellow-300 focus:outline-none focus:ring-2 focus:ring-yellow-500 disabled:cursor-not-allowed disabled:opacity-60"
                     />
@@ -606,7 +648,7 @@ export default function StoreModule() {
                       onChange={(e) => handleFieldChange(it.rowIndex, 'Transfer', e.target.value)}
                       onFocus={() => setFocusedRow(it.rowIndex)}
                       onKeyDown={(e) => handleGridKeyDown(e, 'Transfer')}
-                      onBlur={() => { handleFieldBlur(it.rowIndex); setFocusedRow(null); }}
+                      onBlur={() => setFocusedRow(null)}
                       disabled={!canEdit}
                       className="w-16 bg-transparent px-2 py-1 text-right focus:bg-yellow-300 focus:outline-none focus:ring-2 focus:ring-yellow-500 disabled:cursor-not-allowed disabled:opacity-60"
                     />
@@ -620,7 +662,7 @@ export default function StoreModule() {
                       onChange={(e) => handleFieldChange(it.rowIndex, 'HuHongMat', e.target.value)}
                       onFocus={() => setFocusedRow(it.rowIndex)}
                       onKeyDown={(e) => handleGridKeyDown(e, 'HuHongMat')}
-                      onBlur={() => { handleFieldBlur(it.rowIndex); setFocusedRow(null); }}
+                      onBlur={() => setFocusedRow(null)}
                       disabled={!canEdit}
                       className="w-16 bg-transparent px-2 py-1 text-right focus:bg-yellow-300 focus:outline-none focus:ring-2 focus:ring-yellow-500 disabled:cursor-not-allowed disabled:opacity-60"
                     />
@@ -640,7 +682,7 @@ export default function StoreModule() {
                       onChange={(e) => handleFieldChange(it.rowIndex, 'GhiChu', e.target.value)}
                       onFocus={() => setFocusedRow(it.rowIndex)}
                       onKeyDown={(e) => handleGridKeyDown(e, 'GhiChu')}
-                      onBlur={() => { handleFieldBlur(it.rowIndex); setFocusedRow(null); }}
+                      onBlur={() => setFocusedRow(null)}
                       disabled={!canEdit}
                       className="w-32 bg-transparent px-2 py-1 focus:bg-yellow-300 focus:outline-none focus:ring-2 focus:ring-yellow-500 disabled:cursor-not-allowed disabled:opacity-60"
                     />
