@@ -586,6 +586,7 @@ export default function StoreModule() {
                     <DecimalInput
                       data-field="Ton"
                       allowNegative
+                      hideZero={false}
                       value={it.Ton}
                       onChange={(e) => handleFieldChange(it.rowIndex, 'Ton', e.target.value)}
                       onFocus={() => setFocusedRow(it.rowIndex)}
@@ -600,6 +601,7 @@ export default function StoreModule() {
                     <DecimalInput
                       data-field="Transfer"
                       allowNegative
+                      hideZero={false}
                       value={it.Transfer}
                       onChange={(e) => handleFieldChange(it.rowIndex, 'Transfer', e.target.value)}
                       onFocus={() => setFocusedRow(it.rowIndex)}
@@ -613,6 +615,7 @@ export default function StoreModule() {
                     <DecimalInput
                       data-field="HuHongMat"
                       allowNegative
+                      hideZero={false}
                       value={it.HuHongMat}
                       onChange={(e) => handleFieldChange(it.rowIndex, 'HuHongMat', e.target.value)}
                       onFocus={() => setFocusedRow(it.rowIndex)}
