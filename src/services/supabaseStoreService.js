@@ -26,6 +26,9 @@ const NUMERIC_FIELDS = new Set([
   'SuDung', 'TongXuat', 'Ton', 'TongKho', 'Cost', 'ThanhTien',
 ]);
 
+// Các cột cho phép để TRỐNG thật (NULL): trống = chưa nhập (tính như 0), còn gõ số 0 thì lưu là 0 và hiện "0".
+const BLANKABLE_FIELDS = new Set(['Transfer', 'HuHongMat', 'Ton']);
+
 const TABLE = 'store_items';
 
 // Cột trong Supabase (snake_case) <-> field trong app (PascalCase, khớp
@@ -61,7 +64,8 @@ function itemToRow(item) {
   const row = {};
   Object.entries(FIELD_MAP).forEach(([appField, col]) => {
     if (item[appField] !== undefined) {
-      row[col] = NUMERIC_FIELDS.has(appField) ? num(item[appField]) : item[appField];
+      if (BLANKABLE_FIELDS.has(appField) && (item[appField] === '' || item[appField] === null)) row[col] = null;
+      else row[col] = NUMERIC_FIELDS.has(appField) ? num(item[appField]) : item[appField];
     }
   });
   return row;
@@ -80,8 +84,20 @@ export async function getKhoData(thang) {
 
 /** Lưu 1 dòng (thêm mới nếu không có rowIndex, cập nhật nếu có) */
 export async function saveKhoItem(thang, item) {
-  const row = itemToRow(item);
+  try {
+    return await saveKhoItemRaw(thang, item, itemToRow(item));
+  } catch (err) {
+    // Cột trong Supabase chưa cho phép NULL (chưa chạy file SQL cho phép để trống) -> lưu trống thành 0 như trước
+    if (/null value|not-null|violates not-null/i.test(err.message)) {
+      const row = itemToRow(item);
+      Object.keys(row).forEach((k) => { if (row[k] === null) row[k] = 0; });
+      return saveKhoItemRaw(thang, item, row);
+    }
+    throw err;
+  }
+}
 
+async function saveKhoItemRaw(thang, item, row) {
   if (item.rowIndex) {
     const { data, error } = await supabase
       .from(TABLE)
@@ -148,11 +164,11 @@ export async function rolloverMonth(fromThang, toThang) {
       dau_ky: dauKy,
       set_up: setUp,
       nhap: 0,
-      transfer: 0,
-      hu_hong_mat: 0,
+      transfer: null,
+      hu_hong_mat: null,
       su_dung: 0,
       tong_xuat: 0,
-      ton: 0,
+      ton: null,
       tong_kho: setUp, // Ton mới = 0 -> TongKho = 0 + SetUp
       cost: Number(old.Cost) || 0,
       thanh_tien: 0,
