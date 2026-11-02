@@ -8,7 +8,7 @@ import { buildStandardSheet } from '../../services/excelService';
 import {
   getLinenCatalog, getLinenMonthly, getLinenDaily, saveLinenDay, saveLinenMonthly,
   saveLinenCatalogItem, computeLinenSummary, normLinenName, VAT_RATE,
-  previewLinenCarryOver, carryOverLinenMonth,
+  previewLinenCarryOver, carryOverLinenMonth, getLinenFlags, saveLinenFlags,
 } from '../../services/supabaseLinenService';
 import { parseLaundryFile } from '../../services/laundryFileParser';
 import { downloadLinenStatement } from '../../services/linenStatementExport';
@@ -331,7 +331,11 @@ function SummaryTab({ thang, summary, dailyRows, canEdit, onMonthlyChange, onMon
 // ====================================================================
 // XEM NHANH BẢNG KÊ CẢ THÁNG (cửa sổ nổi) — có thể gõ sửa trực tiếp vào ô
 // ====================================================================
-function QuickView({ thang, items, dailyRows, canEdit, onPickDay, onSaved, onClose }) {
+// màu đánh dấu đối soát: App sai (đã sửa) = vàng, Nhà giặt sai = tím
+const FLAG_BG = { app: 'bg-yellow-300', lg: 'bg-purple-300' };
+const flagKey = (ten, d, f) => `${ten}|${Number(d)}|${f}`;
+
+function QuickView({ thang, items, dailyRows, flags = {}, canEdit, onPickDay, onSaved, onClose }) {
   const [y, m] = thang.split('-').map(Number);
   const dim = daysInMonth(thang);
   const days = Array.from({ length: dim }, (_, i) => i + 1);
@@ -412,9 +416,11 @@ function QuickView({ thang, items, dailyRows, canEdit, onPickDay, onSaved, onClo
   const renderInput = (g, rr, ten, d, f, tone, extra = '') => {
     const changed = `${ten}|${d}|${f}` in edits;
     const val = getVal(ten, d, f);
-    if (!canEdit) return <td className={`${base} ${tone} ${extra}`}>{cell(Number(val) || 0)}</td>;
+    const fl = g === 'qm' ? flags[flagKey(ten, d, f)] : null;
+    const flTitle = fl === 'app' ? 'App nhập sai — đã chỉnh lại' : fl === 'lg' ? 'Nhà giặt sai — giữ số App' : undefined;
+    if (!canEdit) return <td title={flTitle} className={`${base} ${fl ? FLAG_BG[fl] : tone} ${extra}`}>{cell(Number(val) || 0)}</td>;
     return (
-      <td className={`border border-[#141414]/30 p-0 ${changed ? 'bg-yellow-200' : tone}`}>
+      <td title={flTitle} className={`border border-[#141414]/30 p-0 ${changed ? 'bg-yellow-200' : fl ? FLAG_BG[fl] : tone}`}>
         <DecimalInput data-g={g} data-r={rr} data-c={d} value={val} onChange={(e) => setEdit(ten, d, f, e.target.value)}
           className={`w-[34px] bg-transparent px-1 py-0.5 text-right text-[11px] focus:bg-yellow-200 focus:outline-none focus:ring-1 focus:ring-yellow-500 ${extra}`} />
       </td>
@@ -502,6 +508,11 @@ function QuickView({ thang, items, dailyRows, canEdit, onPickDay, onSaved, onClo
           {canEdit ? 'Gõ trực tiếp vào ô để sửa/nhập (ô đã sửa có màu vàng), rồi bấm "Lưu thay đổi" — số tự đổ về đúng ngày và đúng loại linen. ' : ''}
           Dùng phím mũi tên (↑ ↓ ← →) hoặc Enter để chuyển ô, không cần bấm chuột. Bấm vào số ngày ở đầu cột để mở ngày đó ở form nhập. Ô trống = chưa có số liệu.
         </p>
+        <p className="mb-2 flex flex-wrap items-center gap-3 text-[11px] text-slate-600">
+          <span className="font-semibold">Chú thích đối soát:</span>
+          <span className="flex items-center gap-1"><span className="inline-block h-3 w-5 rounded border border-slate-400 bg-yellow-300" /> App nhập sai (đã chỉnh lại)</span>
+          <span className="flex items-center gap-1"><span className="inline-block h-3 w-5 rounded border border-slate-400 bg-purple-300" /> Nhà giặt sai (giữ số App)</span>
+        </p>
         <div className="overflow-x-auto">{renderBlock('main')}</div>
         <h3 className="mb-1 mt-4 text-xs font-bold uppercase text-slate-600">Bảng Rewash (hàng giặt lại)</h3>
         <div className="overflow-x-auto">{renderBlock('rw')}</div>
@@ -513,7 +524,7 @@ function QuickView({ thang, items, dailyRows, canEdit, onPickDay, onSaved, onClo
 // ====================================================================
 // TAB 2 — NHẬP LIỆU DAILY LAUNDRY
 // ====================================================================
-function DailyTab({ thang, catalog, dailyRows, summary, canEdit, onSaved, onSavedAll }) {
+function DailyTab({ thang, catalog, dailyRows, summary, flags, canEdit, onSaved, onSavedAll }) {
   const [ngay, setNgay] = useState(() => defaultDay(thang));
   const [vals, setVals] = useState({});
   const [saving, setSaving] = useState(false);
@@ -708,7 +719,7 @@ function DailyTab({ thang, catalog, dailyRows, summary, canEdit, onSaved, onSave
       </div>
       <div className="mt-3">{rwSaveBar}</div>
       {showView && (
-        <QuickView thang={thang} items={summary.filter((r) => !isHiddenRow(r))} dailyRows={dailyRows} canEdit={canEdit}
+        <QuickView thang={thang} items={summary.filter((r) => !isHiddenRow(r))} dailyRows={dailyRows} flags={flags} canEdit={canEdit}
           onPickDay={(d) => { setNgay(d); setShowView(false); }} onSaved={onSavedAll} onClose={() => setShowView(false)} />
       )}
     </div>
@@ -773,14 +784,15 @@ function reconcile(summary, records, dailyRows, dim) {
 // ====================================================================
 // CỬA SỔ CHI TIẾT: ngày nào lệch + chỉnh số App tại chỗ (giống đối soát bill Minibar)
 // ====================================================================
-function DayDetailModal({ row, thang, canEdit, onClose, onSaved }) {
+function DayDetailModal({ row, thang, flags = {}, canEdit, onClose, onSaved }) {
   const [y, m] = thang.split('-').map(Number);
   const [onlyDiff, setOnlyDiff] = useState(row.hasDays);
   // chỉ ghi nhớ ngày nào đã sửa: { [ngày]: { Do, Sach } }
   const [edits, setEdits] = useState({});
+  const [lgMarks, setLgMarks] = useState({}); // ngày được đánh dấu 'Nhà giặt sai' (chưa lưu)
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState(null);
-  const dirty = Object.keys(edits).length;
+  const dirty = new Set([...Object.keys(edits), ...Object.keys(lgMarks)]).size;
   const weekday = (d) => ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'][new Date(y, m - 1, d).getDay()];
 
   // dòng hiển thị: giá trị App sau khi sửa + chênh lệch làm lại theo số đang gõ
@@ -788,18 +800,29 @@ function DayDetailModal({ row, thang, canEdit, onClose, onSaved }) {
     const e = edits[x.d] || {};
     const appDo = 'Do' in e ? Number(e.Do) || 0 : x.appDo;
     const appSach = 'Sach' in e ? Number(e.Sach) || 0 : x.appSach;
-    return { ...x, curDo: appDo, curSach: appSach, curDDo: appDo - x.lgDo, curDSach: appSach - x.lgSach, baseDiff: x.dDo !== 0 || x.dSach !== 0 };
+    return { ...x, curDo: appDo, curSach: appSach, curDDo: appDo - x.lgDo, curDSach: appSach - x.lgSach, baseDiff: x.dDo !== 0 || x.dSach !== 0, flDo: flags[flagKey(row.ten, x.d, 'Do')], flSach: flags[flagKey(row.ten, x.d, 'Sach')] };
   });
-  const shown = onlyDiff ? view.filter((x) => x.baseDiff) : view;
+  const shown = onlyDiff ? view.filter((x) => x.baseDiff || x.flDo || x.flSach || x.d in edits || lgMarks[x.d]) : view;
   const totals = view.reduce((t, x) => ({ appDo: t.appDo + x.curDo, appSach: t.appSach + x.curSach, lgDo: t.lgDo + x.lgDo, lgSach: t.lgSach + x.lgSach }), { appDo: 0, appSach: 0, lgDo: 0, lgSach: 0 });
 
   const setField = (d, field, v) => setEdits((p) => ({ ...p, [d]: { ...(p[d] || {}), [field]: v } }));
-  const useLaundry = (x) => setEdits((p) => ({ ...p, [x.d]: { Do: x.lgDo, Sach: x.lgSach } }));
+  const useLaundry = (x) => { setLgMarks((p) => { const n = { ...p }; delete n[x.d]; return n; }); setEdits((p) => ({ ...p, [x.d]: { Do: x.lgDo, Sach: x.lgSach } })); };
+  const markLaundryWrong = (x) => { setEdits((p) => { const n = { ...p }; delete n[x.d]; return n; }); setLgMarks((p) => ({ ...p, [x.d]: true })); };
   const useLaundryAllDiff = () => setEdits((p) => {
     const next = { ...p };
     view.filter((x) => x.baseDiff).forEach((x) => { next[x.d] = { Do: x.lgDo, Sach: x.lgSach }; });
     return next;
   });
+
+  const clearFlag = async (x) => {
+    try {
+      const ngay = `${thang}-${pad2(x.d)}`;
+      await saveLinenFlags(thang, ['Do', 'Sach'].map((field) => ({ ngay, TenHang: row.ten, field, nguon: null })));
+      await onSaved();
+    } catch (err) {
+      setMsg({ type: 'err', text: 'Lỗi: ' + err.message });
+    }
+  };
 
   const handleSave = async () => {
     setSaving(true);
@@ -815,8 +838,24 @@ function DayDetailModal({ row, thang, canEdit, onClose, onSaved }) {
           RW: x.rw, RWSach: x.rws,
         }]);
       }
+      // đánh dấu ai sai: sửa số App => App sai (vàng); bấm "Nhà giặt sai" => tím
+      const flagItems = [];
+      for (const [d, e] of Object.entries(edits)) {
+        const x = row.days[Number(d) - 1];
+        const ngay = `${thang}-${pad2(Number(d))}`;
+        if ('Do' in e && (Number(e.Do) || 0) !== x.appDo) flagItems.push({ ngay, TenHang: row.ten, field: 'Do', nguon: 'app' });
+        if ('Sach' in e && (Number(e.Sach) || 0) !== x.appSach) flagItems.push({ ngay, TenHang: row.ten, field: 'Sach', nguon: 'app' });
+      }
+      for (const d of Object.keys(lgMarks)) {
+        const x = row.days[Number(d) - 1];
+        const ngay = `${thang}-${pad2(Number(d))}`;
+        if (x.dDo !== 0) flagItems.push({ ngay, TenHang: row.ten, field: 'Do', nguon: 'lg' });
+        if (x.dSach !== 0) flagItems.push({ ngay, TenHang: row.ten, field: 'Sach', nguon: 'lg' });
+      }
+      if (flagItems.length) await saveLinenFlags(thang, flagItems);
       await onSaved();
       setEdits({});
+      setLgMarks({});
       setMsg({ type: 'ok', text: `Đã lưu ${dirty} ngày. Bảng đối soát đã cập nhật.` });
     } catch (err) {
       setMsg({ type: 'err', text: 'Lỗi khi lưu: ' + err.message });
@@ -896,21 +935,25 @@ function DayDetailModal({ row, thang, canEdit, onClose, onSaved }) {
                 {shown.map((x, idx) => {
                   const ok = x.curDDo === 0 && x.curDSach === 0;
                   const changed = x.d in edits;
+                  const lgm = !!lgMarks[x.d];
+                  const bgDo = changed && 'Do' in edits[x.d] ? 'bg-yellow-300' : lgm && x.dDo !== 0 ? 'bg-purple-300' : x.flDo ? FLAG_BG[x.flDo] : '';
+                  const bgSach = changed && 'Sach' in edits[x.d] ? 'bg-yellow-300' : lgm && x.dSach !== 0 ? 'bg-purple-300' : x.flSach ? FLAG_BG[x.flSach] : '';
+                  const hasFlag = x.flDo || x.flSach;
                   return (
-                    <tr key={x.d} className={changed ? 'bg-yellow-50' : ok ? 'bg-white' : 'bg-red-50'}>
+                    <tr key={x.d} className={changed ? 'bg-yellow-50' : (lgm || (!ok && (x.flDo === 'lg' || x.flSach === 'lg'))) ? 'bg-purple-50' : ok ? 'bg-white' : 'bg-red-50'}>
                       <td className={`${td} whitespace-nowrap font-semibold`}>{pad2(x.d)}/{pad2(m)} <span className="font-normal text-slate-400">{weekday(x.d)}</span></td>
-                      <td className={`${td} p-0`}>
+                      <td className={`${td} p-0 ${bgDo}`}>
                         {canEdit ? (
                           <DecimalInput data-g="dd" data-r={idx} data-c={0} value={x.curDo} onChange={(e) => setField(x.d, 'Do', e.target.value)}
-                            className={`w-full bg-transparent px-2 py-1 text-right focus:bg-yellow-200 focus:outline-none focus:ring-1 focus:ring-yellow-500 ${changed && 'Do' in edits[x.d] ? 'bg-yellow-200' : ''}`} />
+                            className="w-full bg-transparent px-2 py-1 text-right focus:bg-yellow-200 focus:outline-none focus:ring-1 focus:ring-yellow-500" />
                         ) : <span className="block px-2 text-right">{fmtNumber(x.curDo)}</span>}
                       </td>
                       <td className={`${td} text-right`}>{row.hasDays ? fmtNumber(x.lgDo) : '—'}</td>
                       <td className={`${td} text-right ${diffCls(x.curDDo)}`}>{row.hasDays ? fmtDiff(x.curDDo) : '—'}</td>
-                      <td className={`${td} p-0`}>
+                      <td className={`${td} p-0 ${bgSach}`}>
                         {canEdit ? (
                           <DecimalInput data-g="dd" data-r={idx} data-c={1} value={x.curSach} onChange={(e) => setField(x.d, 'Sach', e.target.value)}
-                            className={`w-full bg-transparent px-2 py-1 text-right focus:bg-yellow-200 focus:outline-none focus:ring-1 focus:ring-yellow-500 ${changed && 'Sach' in edits[x.d] ? 'bg-yellow-200' : ''}`} />
+                            className="w-full bg-transparent px-2 py-1 text-right focus:bg-yellow-200 focus:outline-none focus:ring-1 focus:ring-yellow-500" />
                         ) : <span className="block px-2 text-right">{fmtNumber(x.curSach)}</span>}
                       </td>
                       <td className={`${td} text-right`}>{row.hasDays ? fmtNumber(x.lgSach) : '—'}</td>
@@ -918,8 +961,12 @@ function DayDetailModal({ row, thang, canEdit, onClose, onSaved }) {
                       <td className={`${td} text-[11px]`}>
                         {!row.hasDays ? '' : (
                           <span className="flex items-center justify-between gap-2">
-                            <span>{changed ? '🟡 Đã sửa — chưa lưu' : ok ? '🟢 Khớp' : [x.curDDo !== 0 && `Giao ${x.curDDo > 0 ? 'thừa' : 'thiếu'} ${Math.abs(x.curDDo)}`, x.curDSach !== 0 && `Nhận ${x.curDSach > 0 ? 'thừa' : 'thiếu'} ${Math.abs(x.curDSach)}`].filter(Boolean).map((t) => `🔴 ${t}`).join(' · ')}</span>
-                            {canEdit && !ok && <button onClick={() => useLaundry(x)} className="whitespace-nowrap rounded border border-sky-300 bg-white px-1.5 py-0.5 text-[10px] font-medium text-sky-700 hover:bg-sky-50">= số nhà giặt</button>}
+                            <span>{changed ? '🟡 App sai — đã sửa, chưa lưu' : lgm ? '🟣 Nhà giặt sai — chưa lưu' : (hasFlag && (ok || x.flDo === 'lg' || x.flSach === 'lg')) ? (x.flDo === 'lg' || x.flSach === 'lg' ? '🟣 Nhà giặt sai' : '🟡 App sai — đã chỉnh') : ok ? '🟢 Khớp' : [x.curDDo !== 0 && `Giao ${x.curDDo > 0 ? 'thừa' : 'thiếu'} ${Math.abs(x.curDDo)}`, x.curDSach !== 0 && `Nhận ${x.curDSach > 0 ? 'thừa' : 'thiếu'} ${Math.abs(x.curDSach)}`].filter(Boolean).map((t) => `🔴 ${t}`).join(' · ')}</span>
+                            <span className="flex items-center gap-1">
+                              {canEdit && !ok && <button onClick={() => useLaundry(x)} title="App sai: lấy số nhà giặt (ô sẽ nền vàng)" className="whitespace-nowrap rounded border border-yellow-400 bg-yellow-50 px-1.5 py-0.5 text-[10px] font-medium text-yellow-800 hover:bg-yellow-100">App sai → = số nhà giặt</button>}
+                              {canEdit && !ok && !changed && <button onClick={() => markLaundryWrong(x)} title="Nhà giặt sai: giữ số App (ô sẽ nền tím)" className="whitespace-nowrap rounded border border-purple-400 bg-purple-50 px-1.5 py-0.5 text-[10px] font-medium text-purple-800 hover:bg-purple-100">Nhà giặt sai</button>}
+                              {canEdit && hasFlag && !changed && !lgm && <button onClick={() => clearFlag(x)} title="Bỏ đánh dấu màu" className="rounded border border-slate-300 bg-white px-1.5 py-0.5 text-[10px] text-slate-500 hover:bg-slate-100">✕</button>}
+                            </span>
                           </span>
                         )}
                       </td>
@@ -936,7 +983,7 @@ function DayDetailModal({ row, thang, canEdit, onClose, onSaved }) {
   );
 }
 
-function ReconTab({ thang, catalog, summary, dailyRows, canEdit, onSaved }) {
+function ReconTab({ thang, catalog, summary, dailyRows, flags, canEdit, onSaved }) {
   const [records, setRecords] = useState(null);
   const [fileName, setFileName] = useState('');
   const [experimental, setExperimental] = useState(false);
@@ -1096,7 +1143,7 @@ function ReconTab({ thang, catalog, summary, dailyRows, canEdit, onSaved }) {
             </table>
           </div>
           <p className="mt-2 text-[11px] text-slate-400">Chênh lệch = SL App HK − SL Nhà Giặt. Dương: App ghi nhiều hơn nhà giặt (thừa); Âm: App ghi ít hơn (thiếu). Bấm vào ô Trạng thái của từng loại để xem ngày nào lệch và điều chỉnh.</p>
-          {detailRow && <DayDetailModal row={detailRow} thang={thang} canEdit={canEdit} onSaved={onSaved} onClose={() => setDetailKey(null)} />}
+          {detailRow && <DayDetailModal row={detailRow} thang={thang} flags={flags} canEdit={canEdit} onSaved={onSaved} onClose={() => setDetailKey(null)} />}
         </>
       )}
     </div>
@@ -1117,13 +1164,20 @@ export default function LaundryModule() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [savingKey, setSavingKey] = useState(null);
+  const [flagRows, setFlagRows] = useState([]);
+  const flags = useMemo(() => {
+    const mp = {};
+    flagRows.forEach((r) => { mp[flagKey(r.ten_hang, Number(String(r.ngay).slice(8, 10)), r.field)] = r.nguon; });
+    return mp;
+  }, [flagRows]);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const [c, m, d] = await Promise.all([getLinenCatalog(), getLinenMonthly(thang), getLinenDaily(thang)]);
+      const [c, m, d, fl] = await Promise.all([getLinenCatalog(), getLinenMonthly(thang), getLinenDaily(thang), getLinenFlags(thang)]);
       setCatalog(c);
+      setFlagRows(fl);
       setMonthly(m);
       setDaily(d);
     } catch (err) {
@@ -1176,9 +1230,10 @@ export default function LaundryModule() {
   const reloadDaily = async () => setDaily(await getLinenDaily(thang));
   // tải lại nhẹ (không hiện vòng xoay) cả số liệu tháng + ngày — dùng sau khi lưu từ cửa sổ Xem nhanh
   const reloadAll = async () => {
-    const [mo, d] = await Promise.all([getLinenMonthly(thang), getLinenDaily(thang)]);
+    const [mo, d, fl] = await Promise.all([getLinenMonthly(thang), getLinenDaily(thang), getLinenFlags(thang)]);
     setMonthly(mo);
     setDaily(d);
+    setFlagRows(fl);
   };
 
   return (
@@ -1219,9 +1274,9 @@ export default function LaundryModule() {
           onMonthlyChange={handleMonthlyChange} onMonthlySave={handleMonthlySave}
           onPriceChange={handlePriceChange} onPriceSave={handlePriceSave} />
       ) : tab === 'DAILY' ? (
-        <DailyTab thang={thang} catalog={catalog} dailyRows={daily} summary={summary} canEdit={canEdit} onSaved={reloadDaily} onSavedAll={reloadAll} />
+        <DailyTab thang={thang} catalog={catalog} dailyRows={daily} summary={summary} flags={flags} canEdit={canEdit} onSaved={reloadDaily} onSavedAll={reloadAll} />
       ) : (
-        <ReconTab thang={thang} catalog={catalog} summary={summary} dailyRows={daily} canEdit={canEdit} onSaved={reloadAll} />
+        <ReconTab thang={thang} catalog={catalog} summary={summary} dailyRows={daily} flags={flags} canEdit={canEdit} onSaved={reloadAll} />
       )}
     </div>
   );
