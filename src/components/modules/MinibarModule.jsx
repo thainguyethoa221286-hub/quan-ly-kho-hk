@@ -644,7 +644,7 @@ function SummaryTab({ thang, catalog, onReloadCatalog, refreshToken, isActive })
                         onKeyDown={(e) => gridKeyNav(e, 'Nhap')}
                         onBlur={() => persistRow(it.rowIndex)}
                         placeholder="0"
-                        className="w-16 bg-transparent px-2 py-1 text-right focus:bg-yellow-300 focus:outline-none" />
+                        className="w-full min-w-[4rem] bg-transparent px-2 py-1 text-right focus:bg-yellow-300 focus:outline-none" />
                     </td>
                     <td className="border-2 border-[#141414] bg-yellow-100 p-0">
                       <input type="number" data-field="TonKho" value={Number(it.TonKho) === 0 ? '' : it.TonKho}
@@ -652,7 +652,7 @@ function SummaryTab({ thang, catalog, onReloadCatalog, refreshToken, isActive })
                         onKeyDown={(e) => gridKeyNav(e, 'TonKho')}
                         onBlur={() => persistRow(it.rowIndex)}
                         placeholder="0"
-                        className="w-16 bg-transparent px-2 py-1 text-right text-base font-bold focus:bg-yellow-300 focus:outline-none" />
+                        className="w-full min-w-[4rem] bg-transparent px-2 py-1 text-right text-base font-bold focus:bg-yellow-300 focus:outline-none" />
                     </td>
                     <td className="border border-[#141414]/30 px-2 py-1 text-right text-emerald-600">{fmtNumber(it.Billed)}</td>
                     <td className="border border-[#141414]/30 px-2 py-1 text-right text-red-500">{fmtNumber(it.NoCharge)}</td>
@@ -670,7 +670,7 @@ function SummaryTab({ thang, catalog, onReloadCatalog, refreshToken, isActive })
                         onChange={(e) => handleFieldChange(it.rowIndex, 'GhiChu', e.target.value)}
                         onKeyDown={(e) => gridKeyNav(e, 'GhiChu')}
                         onBlur={() => persistRow(it.rowIndex)}
-                        className="w-28 bg-transparent px-2 py-1 focus:bg-yellow-300 focus:outline-none" />
+                        className="w-full min-w-[7rem] bg-transparent px-2 py-1 focus:bg-yellow-300 focus:outline-none" />
                     </td>
                   </tr>
                 );
@@ -1266,7 +1266,7 @@ function SetupTab({ thang }) {
                         onChange={(e) => handleMatrixChange(r.rowIndex, f, e.target.value)}
                         onKeyDown={(e) => gridKeyNav(e, `floor-${f}`)}
                         onBlur={() => persistMatrixRow(r.rowIndex)}
-                        placeholder="0" className="w-14 bg-transparent px-1 py-1 text-center focus:bg-yellow-300 focus:outline-none" />
+                        placeholder="0" className="w-full min-w-[3.5rem] bg-transparent px-1 py-1 text-center focus:bg-yellow-300 focus:outline-none" />
                     </td>
                   ))}
                   <td className="border border-slate-200 px-2 py-1 text-center font-bold">{fmtNumber(r.Total)}</td>
@@ -1307,7 +1307,7 @@ function SetupTab({ thang }) {
                         onChange={(e) => handleFbfoChange(r.rowIndex, f, e.target.value)}
                         onKeyDown={(e) => gridKeyNav(e, f)}
                         onBlur={() => persistFbfoRow(r.rowIndex)}
-                        className="w-16 bg-transparent px-1 py-1 text-center focus:bg-yellow-300 focus:outline-none" />
+                        className="w-full min-w-[4rem] bg-transparent px-1 py-1 text-center focus:bg-yellow-300 focus:outline-none" />
                     </td>
                   ))}
                   <td className="border border-slate-200 px-2 py-1 text-center text-base font-bold text-red-600">{r.FBTransfer ? fmtNumber(r.FBTransfer) : ''}</td>
@@ -1317,7 +1317,7 @@ function SetupTab({ thang }) {
                         onChange={(e) => handleFbfoChange(r.rowIndex, f, e.target.value)}
                         onKeyDown={(e) => gridKeyNav(e, f)}
                         onBlur={() => persistFbfoRow(r.rowIndex)}
-                        className="w-16 bg-transparent px-1 py-1 text-center focus:bg-yellow-300 focus:outline-none" />
+                        className="w-full min-w-[4rem] bg-transparent px-1 py-1 text-center focus:bg-yellow-300 focus:outline-none" />
                     </td>
                   ))}
                   <td className="border border-slate-200 px-2 py-1 text-center text-base font-bold text-red-600">{r.FOTransfer ? fmtNumber(r.FOTransfer) : ''}</td>
@@ -1326,7 +1326,7 @@ function SetupTab({ thang }) {
                       onChange={(e) => handleFbfoChange(r.rowIndex, 'GhiChu', e.target.value)}
                       onKeyDown={(e) => gridKeyNav(e, 'fbfo-ghichu')}
                       onBlur={() => persistFbfoRow(r.rowIndex)}
-                      className="w-32 bg-transparent px-2 py-1 focus:bg-yellow-300 focus:outline-none" />
+                      className="w-full min-w-[8rem] bg-transparent px-2 py-1 focus:bg-yellow-300 focus:outline-none" />
                   </td>
                 </tr>
               ))}
