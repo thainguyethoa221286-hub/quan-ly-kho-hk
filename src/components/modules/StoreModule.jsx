@@ -433,6 +433,11 @@ export default function StoreModule() {
         @media print {
           @page { size: A4 landscape; margin: 10mm; }
         }
+        @keyframes khoArrowBlink {
+          0%, 100% { opacity: 1; transform: translateX(0); }
+          50% { opacity: 0.15; transform: translateX(4px); }
+        }
+        .kho-arrow { animation: khoArrowBlink 0.8s ease-in-out infinite; }
         input[type=number]::-webkit-outer-spin-button,
         input[type=number]::-webkit-inner-spin-button {
           -webkit-appearance: none;
@@ -591,6 +596,7 @@ export default function StoreModule() {
                     }`}
                     title={it.MaHang ? `Mã: ${it.MaHang}` : undefined}
                   >
+                    {focusedRow === it.rowIndex && <span className="kho-arrow mr-1 inline-block font-black text-red-600 print:hidden" aria-hidden="true">▶</span>}
                     {it.TenHang}
                   </td>
                   <td className="border border-[#141414]/30 px-2 py-1">{it.DVT}</td>
