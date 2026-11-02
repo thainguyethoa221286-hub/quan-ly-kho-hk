@@ -223,21 +223,21 @@ export default function OfficeSuppliesModule() {
                       onChange={(e) => handleFieldChange(it.rowIndex, 'DauKy', e.target.value)}
                       onKeyDown={(e) => gridKeyNav(e, 'DauKy')}
                       onBlur={() => persistRow(it.rowIndex)}
-                      placeholder="0" className="w-16 bg-transparent px-2 py-1 text-right focus:bg-yellow-300 focus:outline-none" />
+                      placeholder="0" className="w-full min-w-[4rem] bg-transparent px-2 py-1 text-right focus:bg-yellow-300 focus:outline-none" />
                   </td>
                   <td className="border border-[#141414]/30 p-0">
                     <DecimalInput data-field="Nhap" value={it.Nhap}
                       onChange={(e) => handleFieldChange(it.rowIndex, 'Nhap', e.target.value)}
                       onKeyDown={(e) => gridKeyNav(e, 'Nhap')}
                       onBlur={() => persistRow(it.rowIndex)}
-                      placeholder="0" className="w-16 bg-transparent px-2 py-1 text-right focus:bg-yellow-300 focus:outline-none" />
+                      placeholder="0" className="w-full min-w-[4rem] bg-transparent px-2 py-1 text-right focus:bg-yellow-300 focus:outline-none" />
                   </td>
                   <td className="border-2 border-[#141414] bg-yellow-100 p-0">
                     <DecimalInput data-field="CuoiKy" value={it.CuoiKy}
                       onChange={(e) => handleFieldChange(it.rowIndex, 'CuoiKy', e.target.value)}
                       onKeyDown={(e) => gridKeyNav(e, 'CuoiKy')}
                       onBlur={() => persistRow(it.rowIndex)}
-                      placeholder="0" className="w-16 bg-transparent px-2 py-1 text-right font-bold focus:bg-yellow-300 focus:outline-none" />
+                      placeholder="0" className="w-full min-w-[4rem] bg-transparent px-2 py-1 text-right font-bold focus:bg-yellow-300 focus:outline-none" />
                   </td>
 
                   <td className="border border-[#141414]/30 px-2 py-1 text-right font-semibold">{fmtNumber(it.SuDung)}</td>
@@ -247,7 +247,7 @@ export default function OfficeSuppliesModule() {
                       onChange={(e) => handleFieldChange(it.rowIndex, 'GhiChu', e.target.value)}
                       onKeyDown={(e) => gridKeyNav(e, 'GhiChu')}
                       onBlur={() => persistRow(it.rowIndex)}
-                      className="w-36 bg-transparent px-2 py-1 focus:bg-yellow-300 focus:outline-none" />
+                      className="w-full min-w-[9rem] bg-transparent px-2 py-1 focus:bg-yellow-300 focus:outline-none" />
                   </td>
 
                   <td className="border border-[#141414]/30 px-1 py-1 text-center print:hidden">
