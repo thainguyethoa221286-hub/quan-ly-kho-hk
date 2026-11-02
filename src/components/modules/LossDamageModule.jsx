@@ -462,7 +462,7 @@ export default function LossDamageModule() {
                       }}
                       inputMode="numeric"
                       placeholder="0"
-                      className="w-24 bg-transparent px-2 py-1 text-right text-teal-600 focus:bg-yellow-300 focus:outline-none focus:ring-2 focus:ring-yellow-500"
+                      className="w-full min-w-[6rem] bg-transparent px-2 py-1 text-right text-teal-600 focus:bg-yellow-300 focus:outline-none focus:ring-2 focus:ring-yellow-500"
                     />
                   </td>
                   <td className="border border-[#141414]/30 p-0">
@@ -477,7 +477,7 @@ export default function LossDamageModule() {
                       }}
                       inputMode="numeric"
                       placeholder="0"
-                      className="w-24 bg-transparent px-2 py-1 text-right text-red-500 focus:bg-yellow-300 focus:outline-none focus:ring-2 focus:ring-yellow-500"
+                      className="w-full min-w-[6rem] bg-transparent px-2 py-1 text-right text-red-500 focus:bg-yellow-300 focus:outline-none focus:ring-2 focus:ring-yellow-500"
                     />
                   </td>
                   <td className="border border-[#141414]/30 p-0">
@@ -485,7 +485,7 @@ export default function LossDamageModule() {
                       value={it.NguoiBaoCao || ''}
                       onChange={(e) => handleFieldChange(it.rowIndex, 'NguoiBaoCao', e.target.value)}
                       onBlur={() => persistRow(it.rowIndex)}
-                      className="w-28 bg-transparent px-2 py-1 focus:bg-yellow-300 focus:outline-none focus:ring-2 focus:ring-yellow-500"
+                      className="w-full min-w-[7rem] bg-transparent px-2 py-1 focus:bg-yellow-300 focus:outline-none focus:ring-2 focus:ring-yellow-500"
                     />
                   </td>
                   <td className="border border-[#141414]/30 p-0">
@@ -493,7 +493,7 @@ export default function LossDamageModule() {
                       value={it.GhiChu || ''}
                       onChange={(e) => handleFieldChange(it.rowIndex, 'GhiChu', e.target.value)}
                       onBlur={() => persistRow(it.rowIndex)}
-                      className="w-40 bg-transparent px-2 py-1 focus:bg-yellow-300 focus:outline-none focus:ring-2 focus:ring-yellow-500"
+                      className="w-full min-w-[10rem] bg-transparent px-2 py-1 focus:bg-yellow-300 focus:outline-none focus:ring-2 focus:ring-yellow-500"
                     />
                   </td>
                   <td className="border border-[#141414]/30 px-1 py-1 text-center print:hidden">
