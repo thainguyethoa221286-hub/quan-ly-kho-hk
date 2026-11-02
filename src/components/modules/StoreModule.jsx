@@ -605,7 +605,7 @@ export default function StoreModule() {
                       onKeyDown={(e) => handleGridKeyDown(e, 'SetUp')}
                       onBlur={() => setFocusedRow(null)}
                       disabled={!canEdit}
-                      className="w-16 bg-transparent px-2 py-1 text-right focus:bg-yellow-300 focus:outline-none focus:ring-2 focus:ring-yellow-500 disabled:cursor-not-allowed disabled:opacity-60"
+                      className="w-full min-w-[4rem] bg-transparent px-2 py-1 text-right focus:bg-yellow-300 focus:outline-none focus:ring-2 focus:ring-yellow-500 disabled:cursor-not-allowed disabled:opacity-60"
                     />
                   </td>
 
@@ -619,7 +619,7 @@ export default function StoreModule() {
                       onKeyDown={(e) => handleGridKeyDown(e, 'Nhap')}
                       onBlur={() => setFocusedRow(null)}
                       disabled={!canEdit}
-                      className="w-16 bg-transparent px-2 py-1 text-right focus:bg-yellow-300 focus:outline-none focus:ring-2 focus:ring-yellow-500 disabled:cursor-not-allowed disabled:opacity-60"
+                      className="w-full min-w-[4rem] bg-transparent px-2 py-1 text-right focus:bg-yellow-300 focus:outline-none focus:ring-2 focus:ring-yellow-500 disabled:cursor-not-allowed disabled:opacity-60"
                     />
                   </td>
 
@@ -635,7 +635,7 @@ export default function StoreModule() {
                       onKeyDown={(e) => handleGridKeyDown(e, 'Ton')}
                       onBlur={() => setFocusedRow(null)}
                       disabled={!canEdit}
-                      className="w-16 bg-transparent px-2 py-1 text-right font-semibold text-red-600 focus:bg-yellow-300 focus:outline-none focus:ring-2 focus:ring-yellow-500 disabled:cursor-not-allowed disabled:opacity-60"
+                      className="w-full min-w-[4rem] bg-transparent px-2 py-1 text-right font-semibold text-red-600 focus:bg-yellow-300 focus:outline-none focus:ring-2 focus:ring-yellow-500 disabled:cursor-not-allowed disabled:opacity-60"
                     />
                   </td>
 
@@ -650,7 +650,7 @@ export default function StoreModule() {
                       onKeyDown={(e) => handleGridKeyDown(e, 'Transfer')}
                       onBlur={() => setFocusedRow(null)}
                       disabled={!canEdit}
-                      className="w-16 bg-transparent px-2 py-1 text-right focus:bg-yellow-300 focus:outline-none focus:ring-2 focus:ring-yellow-500 disabled:cursor-not-allowed disabled:opacity-60"
+                      className="w-full min-w-[4rem] bg-transparent px-2 py-1 text-right focus:bg-yellow-300 focus:outline-none focus:ring-2 focus:ring-yellow-500 disabled:cursor-not-allowed disabled:opacity-60"
                     />
                   </td>
                   <td className="border border-[#141414]/30 p-0">
@@ -664,7 +664,7 @@ export default function StoreModule() {
                       onKeyDown={(e) => handleGridKeyDown(e, 'HuHongMat')}
                       onBlur={() => setFocusedRow(null)}
                       disabled={!canEdit}
-                      className="w-16 bg-transparent px-2 py-1 text-right focus:bg-yellow-300 focus:outline-none focus:ring-2 focus:ring-yellow-500 disabled:cursor-not-allowed disabled:opacity-60"
+                      className="w-full min-w-[4rem] bg-transparent px-2 py-1 text-right focus:bg-yellow-300 focus:outline-none focus:ring-2 focus:ring-yellow-500 disabled:cursor-not-allowed disabled:opacity-60"
                     />
                   </td>
                   <td className="border border-[#141414]/30 px-2 py-1 text-right font-semibold" title="Tự động tính = (Đầu kỳ + Nhập) − (Tồn + Transfer + Hư hỏng/mất)">
@@ -684,7 +684,7 @@ export default function StoreModule() {
                       onKeyDown={(e) => handleGridKeyDown(e, 'GhiChu')}
                       onBlur={() => setFocusedRow(null)}
                       disabled={!canEdit}
-                      className="w-32 bg-transparent px-2 py-1 focus:bg-yellow-300 focus:outline-none focus:ring-2 focus:ring-yellow-500 disabled:cursor-not-allowed disabled:opacity-60"
+                      className="w-full min-w-[8rem] bg-transparent px-2 py-1 focus:bg-yellow-300 focus:outline-none focus:ring-2 focus:ring-yellow-500 disabled:cursor-not-allowed disabled:opacity-60"
                     />
                   </td>
 
