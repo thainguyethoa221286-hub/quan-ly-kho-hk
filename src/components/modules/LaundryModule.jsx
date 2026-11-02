@@ -201,7 +201,7 @@ function SummaryTab({ thang, summary, dailyRows, canEdit, onMonthlyChange, onMon
 
   const th = 'sticky top-0 z-20 border border-white/20 bg-slate-700 px-2 py-2 text-left shadow-[0_1px_0_0_#141414]';
   const tdNum = 'border border-[#141414]/30 px-2 py-1 text-right';
-  const inputCls = 'w-20 bg-transparent px-2 py-1 text-right focus:bg-yellow-300 focus:outline-none focus:ring-2 focus:ring-yellow-500 disabled:cursor-not-allowed disabled:opacity-60';
+  const inputCls = 'w-full min-w-[5rem] bg-transparent px-2 py-1 text-right focus:bg-yellow-300 focus:outline-none focus:ring-2 focus:ring-yellow-500 disabled:cursor-not-allowed disabled:opacity-60';
 
   return (
     <div>
