@@ -241,7 +241,7 @@ function SummaryTab({ thang, summary, dailyRows, canEdit, onMonthlyChange, onMon
                 <td className="min-w-[160px] border border-[#141414]/30 px-2 py-1 font-medium">{r.TenHang}</td>
                 <td className="border border-[#141414]/30 px-2 py-1 text-center">{r.DVT}</td>
                 <td className="border border-[#141414]/30 bg-yellow-50 p-0">
-                  <DecimalInput allowNegative value={r.NoDK} disabled={!canEdit} placeholder="0"
+                  <DecimalInput allowNegative hideZero={false} value={r.NoDK} disabled={!canEdit} placeholder="0"
                     onChange={(e) => onMonthlyChange(r.TenHang, 'no_dk', e.target.value)}
                     onBlur={() => onMonthlySave(r.TenHang, { NoDK: r.NoDK })} className={inputCls} />
                 </td>
@@ -304,7 +304,7 @@ function SummaryTab({ thang, summary, dailyRows, canEdit, onMonthlyChange, onMon
                 <td className="min-w-[160px] border border-[#141414]/30 px-2 py-1 font-medium">{r.TenHang}</td>
                 <td className="border border-[#141414]/30 px-2 py-1 text-center">{r.DVT}</td>
                 <td className="border border-[#141414]/30 bg-yellow-50 p-0">
-                  <DecimalInput allowNegative value={r.RWNoDK} disabled={!canEdit} placeholder="0"
+                  <DecimalInput allowNegative hideZero={false} value={r.RWNoDK} disabled={!canEdit} placeholder="0"
                     onChange={(e) => onMonthlyChange(r.TenHang, 'rw_no_dk', e.target.value)}
                     onBlur={() => onMonthlySave(r.TenHang, { RWNoDK: r.RWNoDK })} className={inputCls} />
                 </td>
@@ -356,6 +356,7 @@ function QuickView({ thang, items, dailyRows, flags = {}, canEdit, onPickDay, on
     return mp;
   }, [dailyRows]);
 
+  const daysWithData = useMemo(() => new Set(dailyRows.map((r) => Number(String(r.ngay).slice(8, 10)))), [dailyRows]);
   const keyOf = (ten, d, f) => `${ten}|${d}|${f}`;
   const baseVal = (ten, d, f) => dayMap[ten]?.[d]?.[f] || 0;
   const getVal = (ten, d, f) => { const k = keyOf(ten, d, f); return k in edits ? edits[k] : baseVal(ten, d, f); };
@@ -421,7 +422,7 @@ function QuickView({ thang, items, dailyRows, flags = {}, canEdit, onPickDay, on
     if (!canEdit) return <td title={flTitle} className={`${base} ${fl ? FLAG_BG[fl] : tone} ${extra}`}>{cell(Number(val) || 0)}</td>;
     return (
       <td title={flTitle} className={`border border-[#141414]/30 p-0 ${changed ? 'bg-yellow-200' : fl ? FLAG_BG[fl] : tone}`}>
-        <DecimalInput data-g={g} data-r={rr} data-c={d} value={val} onChange={(e) => setEdit(ten, d, f, e.target.value)}
+        <DecimalInput data-g={g} data-r={rr} data-c={d} hideZero={!daysWithData.has(Number(d))} value={val} onChange={(e) => setEdit(ten, d, f, e.target.value)}
           className={`w-[34px] bg-transparent px-1 py-0.5 text-right text-[11px] focus:bg-yellow-200 focus:outline-none focus:ring-1 focus:ring-yellow-500 ${extra}`} />
       </td>
     );
@@ -467,7 +468,7 @@ function QuickView({ thang, items, dailyRows, flags = {}, canEdit, onPickDay, on
                   <td className="border border-[#141414]/30 bg-red-50 px-1 text-center text-[10px] font-bold text-red-700">DƠ</td>
                   <td rowSpan={2} className={`border border-[#141414]/30 p-0 ${nk in edits ? 'bg-yellow-200' : 'bg-yellow-50'}`}>
                     {canEdit ? (
-                      <DecimalInput data-g={g} data-r={ii * 2} data-c={0} allowNegative value={noDK} onChange={(e) => setEdits((p) => ({ ...p, [nk]: e.target.value }))}
+                      <DecimalInput data-g={g} data-r={ii * 2} data-c={0} allowNegative hideZero={false} value={noDK} onChange={(e) => setEdits((p) => ({ ...p, [nk]: e.target.value }))}
                         className="w-[44px] bg-transparent px-1 py-0.5 text-right text-[11px] font-semibold focus:bg-yellow-200 focus:outline-none focus:ring-1 focus:ring-yellow-500" />
                     ) : <span className="block px-1.5 text-right text-[11px] font-semibold">{fmtNumber(noDK)}</span>}
                   </td>
@@ -544,6 +545,7 @@ function DailyTab({ thang, catalog, dailyRows, summary, flags, canEdit, onSaved,
 
   const inMonth = ngay.startsWith(thang);
   const enteredSet = useMemo(() => new Set(dailyRows.map((r) => r.ngay)), [dailyRows]);
+  const dayEntered = enteredSet.has(ngay); // ngày đã có dữ liệu -> ô trống hiện số 0 rõ ràng
   const hiddenNames = useMemo(() => new Set(summary.filter(isHiddenRow).map((r) => r.TenHang)), [summary]);
   const shownCatalog = useMemo(() => catalog.filter((c) => !hiddenNames.has(c.TenHang)), [catalog, hiddenNames]);
   const noCuoiMap = useMemo(() => Object.fromEntries(summary.map((s) => [s.TenHang, s.NoCuoi])), [summary]);
@@ -669,10 +671,10 @@ function DailyTab({ thang, catalog, dailyRows, summary, flags, canEdit, onSaved,
                 <td className="border border-[#141414]/30 px-2 py-1 font-medium">{c.TenHang}</td>
                 <td className="border border-[#141414]/30 px-2 py-1 text-center">{c.DVT}</td>
                 <td className="border border-[#141414]/30 bg-red-50 px-2 py-1 text-right">
-                  <DecimalInput data-g="dm" data-r={idx} data-c={0} value={vals[c.TenHang]?.Do} onChange={(e) => setVal(c.TenHang, 'Do', e.target.value)} disabled={!canEdit || !inMonth} placeholder="0" className={inputCls} />
+                  <DecimalInput data-g="dm" data-r={idx} data-c={0} hideZero={!dayEntered} value={vals[c.TenHang]?.Do} onChange={(e) => setVal(c.TenHang, 'Do', e.target.value)} disabled={!canEdit || !inMonth} placeholder="0" className={inputCls} />
                 </td>
                 <td className="border border-[#141414]/30 bg-emerald-50 px-2 py-1 text-right">
-                  <DecimalInput data-g="dm" data-r={idx} data-c={1} value={vals[c.TenHang]?.Sach} onChange={(e) => setVal(c.TenHang, 'Sach', e.target.value)} disabled={!canEdit || !inMonth} placeholder="0" className={inputCls} />
+                  <DecimalInput data-g="dm" data-r={idx} data-c={1} hideZero={!dayEntered} value={vals[c.TenHang]?.Sach} onChange={(e) => setVal(c.TenHang, 'Sach', e.target.value)} disabled={!canEdit || !inMonth} placeholder="0" className={inputCls} />
                 </td>
                 <td className={`border border-[#141414]/30 px-2 py-1 text-right font-semibold ${(noCuoiMap[c.TenHang] || 0) < 0 ? 'text-red-600' : ''}`}>{fmtNumber(noCuoiMap[c.TenHang])}</td>
               </tr>
@@ -706,10 +708,10 @@ function DailyTab({ thang, catalog, dailyRows, summary, flags, canEdit, onSaved,
                 <td className="border border-[#141414]/30 px-2 py-1 font-medium">{c.TenHang}</td>
                 <td className="border border-[#141414]/30 px-2 py-1 text-center">{c.DVT}</td>
                 <td className="border border-[#141414]/30 bg-red-50 px-2 py-1 text-right">
-                  <DecimalInput data-g="dr" data-r={idx} data-c={0} value={vals[c.TenHang]?.RW} onChange={(e) => setVal(c.TenHang, 'RW', e.target.value)} disabled={!canEdit || !inMonth} placeholder="0" className={inputCls} />
+                  <DecimalInput data-g="dr" data-r={idx} data-c={0} hideZero={!dayEntered} value={vals[c.TenHang]?.RW} onChange={(e) => setVal(c.TenHang, 'RW', e.target.value)} disabled={!canEdit || !inMonth} placeholder="0" className={inputCls} />
                 </td>
                 <td className="border border-[#141414]/30 bg-emerald-50 px-2 py-1 text-right">
-                  <DecimalInput data-g="dr" data-r={idx} data-c={1} value={vals[c.TenHang]?.RWSach} onChange={(e) => setVal(c.TenHang, 'RWSach', e.target.value)} disabled={!canEdit || !inMonth} placeholder="0" className={inputCls} />
+                  <DecimalInput data-g="dr" data-r={idx} data-c={1} hideZero={!dayEntered} value={vals[c.TenHang]?.RWSach} onChange={(e) => setVal(c.TenHang, 'RWSach', e.target.value)} disabled={!canEdit || !inMonth} placeholder="0" className={inputCls} />
                 </td>
                 <td className={`border border-[#141414]/30 px-2 py-1 text-right font-semibold ${(rwNoMap[c.TenHang] || 0) < 0 ? 'text-red-600' : ''}`}>{fmtNumber(rwNoMap[c.TenHang])}</td>
               </tr>
