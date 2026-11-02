@@ -170,4 +170,41 @@ export async function rolloverLinenMonth(fromThang, toThang) {
   return { fromThang, toThang, rowsCopied: rows.length };
 }
 
+/** "2026-10" -> "2026-11" (qua năm: "2026-12" -> "2027-01") */
+export function nextMonthStr(thang) {
+  const [y, m] = thang.split('-').map(Number);
+  const d = new Date(y, m, 1); // tháng kế (m đã là 1-based nên Date(y, m, 1) = ngày 1 tháng sau)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+
+/** Xem trước kết chuyển: mỗi loại linen -> Nợ ĐK (Dơ/Sạch) và Nợ ĐK RW của tháng sau sẽ là bao nhiêu */
+export async function previewLinenCarryOver(thang) {
+  const next = nextMonthStr(thang);
+  const [summary, nextMonthly] = await Promise.all([getLinenSummary(thang), getLinenMonthly(next)]);
+  const nm = {};
+  nextMonthly.forEach((r) => { nm[r.ten_hang] = r; });
+  const rows = summary.map((x) => ({
+    TenHang: x.TenHang,
+    newNo: x.NoCuoi, oldNo: Number(nm[x.TenHang]?.no_dk) || 0,
+    newRw: x.RWNoCuoi, oldRw: Number(nm[x.TenHang]?.rw_no_dk) || 0,
+  }));
+  return { next, rows, nextHasData: nextMonthly.length > 0 };
+}
+
+/**
+ * KẾT CHUYỂN sang tháng sau: Nợ ĐK (và Nợ ĐK RW) tháng sau = Nợ cuối (và Nợ RW cuối) tháng này.
+ * Chỉ ghi 2 cột Nợ ĐK — KHÔNG đụng số Dơ/Sạch đã nhập của tháng sau. Bấm lại nhiều lần vẫn an toàn
+ * (VD sau khi sửa số tháng này thì kết chuyển lại để tháng sau lấy số mới).
+ */
+export async function carryOverLinenMonth(thang) {
+  const next = nextMonthStr(thang);
+  const summary = await getLinenSummary(thang);
+  const rows = summary.map((x) => ({ thang: next, ten_hang: x.TenHang, no_dk: x.NoCuoi, rw_no_dk: x.RWNoCuoi }));
+  if (rows.length) {
+    const { error } = await supabase.from(MONTHLY).upsert(rows, { onConflict: 'thang,ten_hang' });
+    wrap(error);
+  }
+  return { next, count: rows.length };
+}
+
 export { prevMonthStr };
