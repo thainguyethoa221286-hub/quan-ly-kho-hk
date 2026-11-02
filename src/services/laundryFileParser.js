@@ -2,7 +2,8 @@
  * ============================================================
  *  laundryFileParser.js — Đọc file đối soát của NHÀ GIẶT (Excel / PDF)
  * ============================================================
- *  Trả về: [{ TenHang, Do, Sach, NoDK }] — tổng DƠ (giao giặt) và SẠCH (nhận về) cả tháng.
+ *  Trả về: [{ TenHang, Do, Sach, NoDK, DoDays, SachDays }] — tổng DƠ/SẠCH cả tháng và số theo từng ngày
+ *  (DoDays/SachDays = { [ngày 1..31]: số }, chỉ có với file Excel dạng bảng kê).
  *
  *  1) Excel "Bảng kê chi tiết giặt ủi" (mẫu M Hotel T09/2026):
  *       cột A = MẶT HÀNG, cột B = DƠ / SẠCH (2 dòng cho mỗi mặt hàng),
@@ -36,6 +37,18 @@ function parseDetailedSheet(rows) {
   }
   if (headerRow < 0) return null;
 
+  // Cột nào là ngày nào: đọc dòng tiêu đề "MẶT HÀNG" (ô chứa số 1..31 hoặc ngày dạng 1900-01-N).
+  // Cột đầu có thể là "ngày cuối tháng trước" (VD 30) -> cột sau cùng ngày đè lên nên không lẫn.
+  const dayCols = {};
+  const hdr = rows[headerRow] || [];
+  const lim = colTotal > 0 ? colTotal : hdr.length;
+  for (let c = 3; c < lim; c++) {
+    let v = hdr[c];
+    if (v instanceof Date) v = v.getUTCDate();
+    v = n(v);
+    if (Number.isInteger(v) && v >= 1 && v <= 31) dayCols[v] = c;
+  }
+
   const out = [];
   for (let r = headerRow + 1; r < rows.length - 1; r++) {
     const row = rows[r] || [];
@@ -61,7 +74,15 @@ function parseDetailedSheet(rows) {
     if (!Number.isFinite(tDo)) tDo = sumDays(row);
     if (!Number.isFinite(tSach)) tSach = sumDays(next);
     const noDK = n(row[2]);
-    out.push({ TenHang: name, Do: tDo, Sach: tSach, NoDK: Number.isFinite(noDK) ? noDK : 0 });
+    const DoDays = {};
+    const SachDays = {};
+    Object.entries(dayCols).forEach(([d, c]) => {
+      const a = n(row[c]);
+      const b = n(next[c]);
+      if (Number.isFinite(a) && a !== 0) DoDays[d] = a;
+      if (Number.isFinite(b) && b !== 0) SachDays[d] = b;
+    });
+    out.push({ TenHang: name, Do: tDo, Sach: tSach, NoDK: Number.isFinite(noDK) ? noDK : 0, DoDays, SachDays, hasDays: Object.keys(dayCols).length > 0 });
     r += 1;
   }
   return out;
