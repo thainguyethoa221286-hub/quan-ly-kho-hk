@@ -207,4 +207,26 @@ export async function carryOverLinenMonth(thang) {
   return { next, count: rows.length };
 }
 
+const FLAGS = 'linen_flags';
+
+/** Đánh dấu đối soát của tháng: [{ngay, ten_hang, field:'Do'|'Sach', nguon:'app'|'lg'}]. Chưa tạo bảng -> trả [] (không làm hỏng app). */
+export async function getLinenFlags(thang) {
+  const { data, error } = await supabase.from(FLAGS).select('*').eq('thang', thang);
+  if (error) return [];
+  return data || [];
+}
+
+/** items: [{ngay, TenHang, field, nguon}] — nguon 'app' | 'lg' | null (null = bỏ đánh dấu) */
+export async function saveLinenFlags(thang, items) {
+  const up = items.filter((i) => i.nguon).map((i) => ({ thang, ngay: i.ngay, ten_hang: i.TenHang, field: i.field, nguon: i.nguon }));
+  if (up.length) {
+    const { error } = await supabase.from(FLAGS).upsert(up, { onConflict: 'ngay,ten_hang,field' });
+    wrap(error);
+  }
+  for (const i of items.filter((x) => !x.nguon)) {
+    const { error } = await supabase.from(FLAGS).delete().eq('ngay', i.ngay).eq('ten_hang', i.TenHang).eq('field', i.field);
+    wrap(error);
+  }
+}
+
 export { prevMonthStr };
