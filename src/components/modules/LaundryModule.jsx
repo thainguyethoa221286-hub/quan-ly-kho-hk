@@ -613,34 +613,225 @@ function DailyTab({ thang, catalog, dailyRows, summary, canEdit, onSaved, onSave
 // ====================================================================
 // TAB 3 — ĐỐI SOÁT VỚI NHÀ GIẶT
 // ====================================================================
-function reconcile(summary, records) {
+/** So sánh từng ngày của 1 loại linen: App (số đã nhập) với nhà giặt. Trả về mảng 1..dim */
+function buildDays(ten, dim, appDays, lg) {
+  const a = appDays[ten] || {};
+  return Array.from({ length: dim }, (_, i) => {
+    const d = i + 1;
+    const appDo = Number(a[d]?.do) || 0;
+    const appSach = Number(a[d]?.sach) || 0;
+    const lgDo = lg ? Number(lg.doDays[d]) || 0 : 0;
+    const lgSach = lg ? Number(lg.sachDays[d]) || 0 : 0;
+    return { d, appDo, appSach, lgDo, lgSach, dDo: appDo - lgDo, dSach: appSach - lgSach, rw: a[d]?.rw || 0, rws: a[d]?.rws || 0 };
+  });
+}
+
+function reconcile(summary, records, dailyRows, dim) {
   const app = {};
   summary.forEach((s) => { app[normLinenName(s.TenHang)] = { ten: s.TenHang, do: s.TongDo, sach: s.TongSach }; });
+  const appDays = {};
+  dailyRows.forEach((r) => {
+    const d = Number(String(r.ngay).slice(8, 10));
+    (appDays[r.ten_hang] ||= {})[d] = { do: Number(r.do_sl) || 0, sach: Number(r.sach_sl) || 0, rw: Number(r.rw_sl) || 0, rws: Number(r.rw_sach_sl) || 0 };
+  });
   const laundry = {};
   records.forEach((r) => {
     const k = normLinenName(r.TenHang);
-    const t = (laundry[k] ||= { ten: r.TenHang, do: 0, sach: 0 });
+    const t = (laundry[k] ||= { ten: r.TenHang, do: 0, sach: 0, doDays: {}, sachDays: {}, hasDays: false });
     t.do += Number(r.Do) || 0;
     t.sach += Number(r.Sach) || 0;
+    if (r.hasDays) t.hasDays = true;
+    Object.entries(r.DoDays || {}).forEach(([d, v]) => { t.doDays[d] = (t.doDays[d] || 0) + v; });
+    Object.entries(r.SachDays || {}).forEach(([d, v]) => { t.sachDays[d] = (t.sachDays[d] || 0) + v; });
   });
   const keys = [...summary.map((s) => normLinenName(s.TenHang)), ...Object.keys(laundry).filter((k) => !app[k])];
   return keys.map((k, i) => {
     const a = app[k] || { ten: laundry[k].ten, do: 0, sach: 0, missingInApp: true };
-    const l = laundry[k] || { do: 0, sach: 0, missing: true };
+    const l = laundry[k] || { do: 0, sach: 0, doDays: {}, sachDays: {}, hasDays: false, missing: true };
     const dDo = a.do - l.do;
     const dSach = a.sach - l.sach;
+    const hasDays = !!l.hasDays;
+    const days = buildDays(a.ten, dim, appDays, hasDays ? l : null);
+    const dayDiff = hasDays ? days.filter((x) => x.dDo !== 0 || x.dSach !== 0).length : 0;
     const parts = [];
     if (dDo !== 0) parts.push(`Giao: App ${dDo > 0 ? 'thừa' : 'thiếu'} ${Math.abs(dDo)}`);
     if (dSach !== 0) parts.push(`Nhận: App ${dSach > 0 ? 'thừa' : 'thiếu'} ${Math.abs(dSach)}`);
     return {
       stt: i + 1, ten: a.ten, appDo: a.do, lgDo: l.do, dDo, appSach: a.sach, lgSach: l.sach, dSach,
       ok: dDo === 0 && dSach === 0, text: parts.join(' · '),
+      hasDays, days, dayDiff, // dayDiff = số ngày có lệch
       note: a.missingInApp ? 'Không có trong danh mục App' : l.missing ? 'Nhà giặt không có dòng này' : '',
     };
   });
 }
 
-function ReconTab({ thang, catalog, summary }) {
+// ====================================================================
+// CỬA SỔ CHI TIẾT: ngày nào lệch + chỉnh số App tại chỗ (giống đối soát bill Minibar)
+// ====================================================================
+function DayDetailModal({ row, thang, canEdit, onClose, onSaved }) {
+  const [y, m] = thang.split('-').map(Number);
+  const [onlyDiff, setOnlyDiff] = useState(row.hasDays);
+  // chỉ ghi nhớ ngày nào đã sửa: { [ngày]: { Do, Sach } }
+  const [edits, setEdits] = useState({});
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState(null);
+  const dirty = Object.keys(edits).length;
+  const weekday = (d) => ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'][new Date(y, m - 1, d).getDay()];
+
+  // dòng hiển thị: giá trị App sau khi sửa + chênh lệch làm lại theo số đang gõ
+  const view = row.days.map((x) => {
+    const e = edits[x.d] || {};
+    const appDo = 'Do' in e ? Number(e.Do) || 0 : x.appDo;
+    const appSach = 'Sach' in e ? Number(e.Sach) || 0 : x.appSach;
+    return { ...x, curDo: appDo, curSach: appSach, curDDo: appDo - x.lgDo, curDSach: appSach - x.lgSach, baseDiff: x.dDo !== 0 || x.dSach !== 0 };
+  });
+  const shown = onlyDiff ? view.filter((x) => x.baseDiff) : view;
+  const totals = view.reduce((t, x) => ({ appDo: t.appDo + x.curDo, appSach: t.appSach + x.curSach, lgDo: t.lgDo + x.lgDo, lgSach: t.lgSach + x.lgSach }), { appDo: 0, appSach: 0, lgDo: 0, lgSach: 0 });
+
+  const setField = (d, field, v) => setEdits((p) => ({ ...p, [d]: { ...(p[d] || {}), [field]: v } }));
+  const useLaundry = (x) => setEdits((p) => ({ ...p, [x.d]: { Do: x.lgDo, Sach: x.lgSach } }));
+  const useLaundryAllDiff = () => setEdits((p) => {
+    const next = { ...p };
+    view.filter((x) => x.baseDiff).forEach((x) => { next[x.d] = { Do: x.lgDo, Sach: x.lgSach }; });
+    return next;
+  });
+
+  const handleSave = async () => {
+    setSaving(true);
+    setMsg(null);
+    try {
+      for (const [d, e] of Object.entries(edits)) {
+        const x = row.days[Number(d) - 1];
+        // giữ nguyên RW đang có của ngày đó (saveLinenDay ghi cả 4 cột)
+        await saveLinenDay(thang, `${thang}-${pad2(Number(d))}`, [{
+          TenHang: row.ten,
+          Do: 'Do' in e ? e.Do : x.appDo,
+          Sach: 'Sach' in e ? e.Sach : x.appSach,
+          RW: x.rw, RWSach: x.rws,
+        }]);
+      }
+      await onSaved();
+      setEdits({});
+      setMsg({ type: 'ok', text: `Đã lưu ${dirty} ngày. Bảng đối soát đã cập nhật.` });
+    } catch (err) {
+      setMsg({ type: 'err', text: 'Lỗi khi lưu: ' + err.message });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const tryClose = () => {
+    if (dirty > 0 && !window.confirm(`Còn ${dirty} ngày đã sửa nhưng CHƯA LƯU. Đóng và bỏ các thay đổi này?`)) return;
+    onClose();
+  };
+
+  const td = 'border border-slate-200 px-2 py-1';
+  const diffCls = (v) => (v === 0 ? 'text-slate-400' : v > 0 ? 'font-bold text-red-600' : 'font-bold text-blue-600');
+  const fmtDiff = (v) => `${v > 0 ? '+' : ''}${fmtNumber(v)}`;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={tryClose}>
+      <div className="flex max-h-[90vh] w-[980px] max-w-full flex-col rounded-lg bg-white p-5 shadow-xl" onClick={(e) => e.stopPropagation()} onKeyDown={gridKeyNav}>
+        <div className="mb-3 flex items-center justify-between border-b border-slate-200 pb-3">
+          <h3 className="flex items-center gap-2 text-base font-bold text-[#141414]">
+            <AlertTriangle className={`h-5 w-5 ${row.ok && row.dayDiff === 0 ? 'text-emerald-600' : 'text-red-600'}`} />
+            Chi tiết đối soát: {row.ten} — tháng {pad2(m)}/{y}
+          </h3>
+          <button onClick={tryClose}><X className="h-5 w-5 text-slate-400" /></button>
+        </div>
+
+        {!row.hasDays && (
+          <p className="mb-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700">
+            File nhà giặt này không có số theo từng ngày (có thể là file PDF), nên chỉ so được tổng cả tháng. Cột "Nhà giặt" từng ngày để trống. Để xem ngày lệch, hãy upload file Excel "Bảng kê chi tiết giặt ủi" của nhà giặt.
+          </p>
+        )}
+
+        <div className="mb-3 flex flex-wrap items-center gap-3 text-xs">
+          <span className="rounded-lg bg-slate-100 px-3 py-1.5">Tổng Giao (Dơ): App <strong>{fmtNumber(totals.appDo)}</strong> · Nhà giặt <strong>{fmtNumber(totals.lgDo)}</strong> · <span className={diffCls(totals.appDo - totals.lgDo)}>{fmtDiff(totals.appDo - totals.lgDo)}</span></span>
+          <span className="rounded-lg bg-slate-100 px-3 py-1.5">Tổng Nhận (Sạch): App <strong>{fmtNumber(totals.appSach)}</strong> · Nhà giặt <strong>{fmtNumber(totals.lgSach)}</strong> · <span className={diffCls(totals.appSach - totals.lgSach)}>{fmtDiff(totals.appSach - totals.lgSach)}</span></span>
+          {row.hasDays && (
+            <label className="flex cursor-pointer items-center gap-1">
+              <input type="checkbox" checked={onlyDiff} onChange={(e) => setOnlyDiff(e.target.checked)} /> Chỉ hiện ngày lệch ({row.dayDiff})
+            </label>
+          )}
+          <div className="ml-auto flex flex-wrap items-center gap-2">
+            {msg && <span className={`rounded-lg px-3 py-1 font-medium ${msg.type === 'ok' ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>{msg.text}</span>}
+            {canEdit && row.hasDays && (
+              <button onClick={useLaundryAllDiff} className="rounded-lg border border-sky-200 bg-sky-50 px-3 py-1.5 font-medium text-sky-700 hover:bg-sky-100">
+                Lấy số nhà giặt cho tất cả ngày lệch
+              </button>
+            )}
+            {canEdit && (
+              <button onClick={handleSave} disabled={saving || dirty === 0}
+                className="flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-1.5 font-bold text-white shadow-md hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-40">
+                {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />} Lưu điều chỉnh{dirty > 0 ? ` (${dirty} ngày)` : ''}
+              </button>
+            )}
+          </div>
+        </div>
+
+        <div className="flex-1 overflow-y-auto rounded border border-slate-200">
+          {shown.length === 0 ? (
+            <p className="py-8 text-center text-sm text-slate-400">Không có ngày nào lệch 🎉</p>
+          ) : (
+            <table className="w-full border-collapse text-xs">
+              <thead className="sticky top-0 z-10 text-[11px] font-bold uppercase text-white">
+                <tr>
+                  <th className="border border-white/20 bg-slate-700 px-2 py-1.5 text-left">Ngày</th>
+                  <th className="border border-white/20 bg-red-700 px-2 py-1.5 text-right">Giao (Dơ) App</th>
+                  <th className="border border-white/20 bg-red-700 px-2 py-1.5 text-right">Nhà giặt</th>
+                  <th className="border border-white/20 bg-red-700 px-2 py-1.5 text-right">Lệch</th>
+                  <th className="border border-white/20 bg-emerald-700 px-2 py-1.5 text-right">Nhận (Sạch) App</th>
+                  <th className="border border-white/20 bg-emerald-700 px-2 py-1.5 text-right">Nhà giặt</th>
+                  <th className="border border-white/20 bg-emerald-700 px-2 py-1.5 text-right">Lệch</th>
+                  <th className="border border-white/20 bg-slate-700 px-2 py-1.5 text-left">Trạng thái</th>
+                </tr>
+              </thead>
+              <tbody>
+                {shown.map((x, idx) => {
+                  const ok = x.curDDo === 0 && x.curDSach === 0;
+                  const changed = x.d in edits;
+                  return (
+                    <tr key={x.d} className={changed ? 'bg-yellow-50' : ok ? 'bg-white' : 'bg-red-50'}>
+                      <td className={`${td} whitespace-nowrap font-semibold`}>{pad2(x.d)}/{pad2(m)} <span className="font-normal text-slate-400">{weekday(x.d)}</span></td>
+                      <td className={`${td} p-0`}>
+                        {canEdit ? (
+                          <DecimalInput data-g="dd" data-r={idx} data-c={0} value={x.curDo} onChange={(e) => setField(x.d, 'Do', e.target.value)}
+                            className={`w-full bg-transparent px-2 py-1 text-right focus:bg-yellow-200 focus:outline-none focus:ring-1 focus:ring-yellow-500 ${changed && 'Do' in edits[x.d] ? 'bg-yellow-200' : ''}`} />
+                        ) : <span className="block px-2 text-right">{fmtNumber(x.curDo)}</span>}
+                      </td>
+                      <td className={`${td} text-right`}>{row.hasDays ? fmtNumber(x.lgDo) : '—'}</td>
+                      <td className={`${td} text-right ${diffCls(x.curDDo)}`}>{row.hasDays ? fmtDiff(x.curDDo) : '—'}</td>
+                      <td className={`${td} p-0`}>
+                        {canEdit ? (
+                          <DecimalInput data-g="dd" data-r={idx} data-c={1} value={x.curSach} onChange={(e) => setField(x.d, 'Sach', e.target.value)}
+                            className={`w-full bg-transparent px-2 py-1 text-right focus:bg-yellow-200 focus:outline-none focus:ring-1 focus:ring-yellow-500 ${changed && 'Sach' in edits[x.d] ? 'bg-yellow-200' : ''}`} />
+                        ) : <span className="block px-2 text-right">{fmtNumber(x.curSach)}</span>}
+                      </td>
+                      <td className={`${td} text-right`}>{row.hasDays ? fmtNumber(x.lgSach) : '—'}</td>
+                      <td className={`${td} text-right ${diffCls(x.curDSach)}`}>{row.hasDays ? fmtDiff(x.curDSach) : '—'}</td>
+                      <td className={`${td} text-[11px]`}>
+                        {!row.hasDays ? '' : (
+                          <span className="flex items-center justify-between gap-2">
+                            <span>{changed ? '🟡 Đã sửa — chưa lưu' : ok ? '🟢 Khớp' : [x.curDDo !== 0 && `Giao ${x.curDDo > 0 ? 'thừa' : 'thiếu'} ${Math.abs(x.curDDo)}`, x.curDSach !== 0 && `Nhận ${x.curDSach > 0 ? 'thừa' : 'thiếu'} ${Math.abs(x.curDSach)}`].filter(Boolean).map((t) => `🔴 ${t}`).join(' · ')}</span>
+                            {canEdit && !ok && <button onClick={() => useLaundry(x)} className="whitespace-nowrap rounded border border-sky-300 bg-white px-1.5 py-0.5 text-[10px] font-medium text-sky-700 hover:bg-sky-50">= số nhà giặt</button>}
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
+        </div>
+        <p className="mt-2 text-[11px] text-slate-400">Chênh lệch = App − Nhà giặt (dương: App ghi nhiều hơn; âm: App ghi ít hơn). Gõ trực tiếp vào cột App để sửa (dùng phím ↑ ↓ ← → hoặc Enter để chuyển ô), rồi bấm "Lưu điều chỉnh". Số Rewash của ngày đó được giữ nguyên.</p>
+      </div>
+    </div>
+  );
+}
+
+function ReconTab({ thang, catalog, summary, dailyRows, canEdit, onSaved }) {
   const [records, setRecords] = useState(null);
   const [fileName, setFileName] = useState('');
   const [experimental, setExperimental] = useState(false);
@@ -648,7 +839,9 @@ function ReconTab({ thang, catalog, summary }) {
   const [error, setError] = useState(null);
   const [onlyDiff, setOnlyDiff] = useState(false);
 
-  const rows = useMemo(() => (records ? reconcile(summary, records) : []), [summary, records]);
+  const [detailKey, setDetailKey] = useState(null);
+  const rows = useMemo(() => (records ? reconcile(summary, records, dailyRows, daysInMonth(thang)) : []), [summary, records, dailyRows, thang]);
+  const detailRow = detailKey ? rows.find((r) => r.ten === detailKey) : null;
   const diffCount = rows.filter((r) => !r.ok).length;
   const shown = onlyDiff ? rows.filter((r) => !r.ok) : rows;
 
@@ -685,6 +878,25 @@ function ReconTab({ thang, catalog, summary }) {
     });
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'DOI_SOAT_LINEN');
+
+    // Sheet 2: chi tiết các NGÀY lệch của từng loại linen (chỉ khi file nhà giặt có số theo ngày)
+    const dayRows = [];
+    rows.filter((r) => r.hasDays).forEach((r) => {
+      r.days.filter((x) => x.dDo !== 0 || x.dSach !== 0).forEach((x) => {
+        dayRows.push([r.ten, `${pad2(x.d)}/${pad2(m)}/${y}`, x.appDo, x.lgDo, x.dDo, x.appSach, x.lgSach, x.dSach,
+          [x.dDo !== 0 && `Giao: App ${x.dDo > 0 ? 'thừa' : 'thiếu'} ${Math.abs(x.dDo)}`, x.dSach !== 0 && `Nhận: App ${x.dSach > 0 ? 'thừa' : 'thiếu'} ${Math.abs(x.dSach)}`].filter(Boolean).join(' · ')]);
+      });
+    });
+    if (dayRows.length > 0) {
+      const { ws: ws2 } = buildStandardSheet({
+        title: `CHI TIẾT CÁC NGÀY LỆCH LINEN THÁNG ${pad2(m)}/${y}`,
+        subtitles: [`File nhà giặt: ${fileName}`],
+        headers: ['TÊN LOẠI LINEN', 'NGÀY', 'GIAO (DƠ) APP HK', 'GIAO (DƠ) NHÀ GIẶT', 'GIAO CHÊNH LỆCH', 'NHẬN (SẠCH) APP HK', 'NHẬN (SẠCH) NHÀ GIẶT', 'NHẬN CHÊNH LỆCH', 'GHI CHÚ'],
+        colTypes: ['text', 'center', 'num', 'num', 'num', 'num', 'num', 'num', 'text'],
+        rows: dayRows,
+      });
+      XLSX.utils.book_append_sheet(wb, ws2, 'NGAY_LECH');
+    }
     XLSX.writeFile(wb, `Doi_Soat_Linen_${thang}.xlsx`);
   };
 
@@ -765,15 +977,21 @@ function ReconTab({ thang, catalog, summary }) {
                     <td className="border border-[#141414]/30 px-2 py-1 text-right">{fmtNumber(r.appSach)}</td>
                     <td className="border border-[#141414]/30 px-2 py-1 text-right">{fmtNumber(r.lgSach)}</td>
                     <td className={`border border-[#141414]/30 px-2 py-1 text-right font-bold ${r.dSach !== 0 ? 'text-red-600' : ''}`}>{r.dSach > 0 ? '+' : ''}{fmtNumber(r.dSach)}</td>
-                    <td className="border border-[#141414]/30 px-2 py-1">
-                      {r.ok ? <span className="font-semibold text-emerald-700">🟢 Khớp số lượng</span> : <span className="font-semibold text-red-600">🔴 {r.text}</span>}
+                    <td className="cursor-pointer border border-[#141414]/30 px-2 py-1 hover:bg-amber-100" onClick={() => setDetailKey(r.ten)} title="Bấm để xem ngày nào lệch và điều chỉnh">
+                      {r.ok
+                        ? (r.dayDiff > 0
+                          ? <span className="font-semibold text-amber-700">🟡 Khớp tổng, lệch {r.dayDiff} ngày</span>
+                          : <span className="font-semibold text-emerald-700">🟢 Khớp số lượng</span>)
+                        : <span className="font-semibold text-red-600">🔴 {r.text}{r.dayDiff > 0 ? ` (${r.dayDiff} ngày lệch)` : ''}</span>}
+                      <span className="ml-2 text-[10px] font-normal text-sky-600 underline">Xem ngày</span>
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-          <p className="mt-2 text-[11px] text-slate-400">Chênh lệch = SL App HK − SL Nhà Giặt. Dương: App ghi nhiều hơn nhà giặt (thừa); Âm: App ghi ít hơn (thiếu).</p>
+          <p className="mt-2 text-[11px] text-slate-400">Chênh lệch = SL App HK − SL Nhà Giặt. Dương: App ghi nhiều hơn nhà giặt (thừa); Âm: App ghi ít hơn (thiếu). Bấm vào ô Trạng thái của từng loại để xem ngày nào lệch và điều chỉnh.</p>
+          {detailRow && <DayDetailModal row={detailRow} thang={thang} canEdit={canEdit} onSaved={onSaved} onClose={() => setDetailKey(null)} />}
         </>
       )}
     </div>
@@ -898,7 +1116,7 @@ export default function LaundryModule() {
       ) : tab === 'DAILY' ? (
         <DailyTab thang={thang} catalog={catalog} dailyRows={daily} summary={summary} canEdit={canEdit} onSaved={reloadDaily} onSavedAll={reloadAll} />
       ) : (
-        <ReconTab thang={thang} catalog={catalog} summary={summary} />
+        <ReconTab thang={thang} catalog={catalog} summary={summary} dailyRows={daily} canEdit={canEdit} onSaved={reloadAll} />
       )}
     </div>
   );
