@@ -8,6 +8,7 @@ import { buildStandardSheet } from '../../services/excelService';
 import {
   getLinenCatalog, getLinenMonthly, getLinenDaily, saveLinenDay, saveLinenMonthly,
   saveLinenCatalogItem, computeLinenSummary, normLinenName, VAT_RATE,
+  previewLinenCarryOver, carryOverLinenMonth,
 } from '../../services/supabaseLinenService';
 import { parseLaundryFile } from '../../services/laundryFileParser';
 import { downloadLinenStatement } from '../../services/linenStatementExport';
@@ -73,6 +74,71 @@ const defaultDay = (thang) => {
 };
 
 // ====================================================================
+// KẾT CHUYỂN SANG THÁNG SAU (xem trước -> xác nhận)
+// ====================================================================
+function CarryOverModal({ thang, preview, busy, onConfirm, onClose }) {
+  const [y, m] = thang.split('-').map(Number);
+  const [ny, nm] = preview.next.split('-').map(Number);
+  const visible = preview.rows.filter((r) => !isHiddenRow(r) || r.newNo || r.newRw || r.oldNo || r.oldRw);
+  const changed = visible.filter((r) => r.newNo !== r.oldNo || r.newRw !== r.oldRw).length;
+  const th = 'border border-white/20 bg-slate-700 px-2 py-1.5 text-right';
+  const td = 'border border-slate-200 px-2 py-1 text-right';
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+      <div className="flex max-h-[90vh] w-[820px] max-w-full flex-col rounded-lg bg-white p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
+        <div className="mb-3 flex items-center justify-between border-b border-slate-200 pb-3">
+          <h3 className="text-base font-bold">Kết chuyển Linen: tháng {pad2(m)}/{y} → tháng {pad2(nm)}/{ny}</h3>
+          <button onClick={onClose}><X className="h-5 w-5 text-slate-400" /></button>
+        </div>
+        <p className="mb-2 text-xs text-slate-600">
+          Nợ đầu kỳ tháng {pad2(nm)}/{ny} sẽ = Nợ cuối kỳ tháng {pad2(m)}/{y} (cả bảng Dơ/Sạch và bảng Rewash).
+          Chỉ cập nhật 2 cột Nợ đầu kỳ, <strong>không đụng</strong> số Dơ/Sạch đã nhập của tháng {pad2(nm)}.
+          {preview.nextHasData ? ' Tháng sau đã có dữ liệu — các ô vàng bên dưới là số sẽ được cập nhật lại.' : ''}
+        </p>
+        <p className={`mb-2 rounded-lg px-3 py-1.5 text-xs font-medium ${changed ? 'bg-amber-50 text-amber-700' : 'bg-emerald-50 text-emerald-700'}`}>
+          {changed ? `${changed} loại sẽ thay đổi Nợ đầu kỳ tháng sau.` : 'Tháng sau đã có đúng số này — không có gì thay đổi.'}
+        </p>
+        <div className="flex-1 overflow-y-auto rounded border border-slate-200">
+          <table className="w-full border-collapse text-xs">
+            <thead className="sticky top-0 text-[11px] font-bold uppercase text-white">
+              <tr>
+                <th className="border border-white/20 bg-slate-700 px-2 py-1.5 text-left">Loại linen</th>
+                <th className={th}>Nợ cuối T{pad2(m)}</th>
+                <th className={th}>Nợ ĐK T{pad2(nm)} hiện tại</th>
+                <th className={th}>Nợ RW cuối T{pad2(m)}</th>
+                <th className={th}>Nợ ĐK RW T{pad2(nm)} hiện tại</th>
+              </tr>
+            </thead>
+            <tbody>
+              {visible.map((r) => {
+                const c1 = r.newNo !== r.oldNo;
+                const c2 = r.newRw !== r.oldRw;
+                return (
+                  <tr key={r.TenHang}>
+                    <td className="border border-slate-200 px-2 py-1 font-medium">{r.TenHang}</td>
+                    <td className={`${td} font-semibold ${r.newNo < 0 ? 'text-red-600' : ''}`}>{fmtNumber(r.newNo)}</td>
+                    <td className={`${td} ${c1 ? 'bg-yellow-100 font-bold' : ''}`}>{fmtNumber(r.oldNo)}{c1 ? ` → ${fmtNumber(r.newNo)}` : ''}</td>
+                    <td className={`${td} font-semibold`}>{fmtNumber(r.newRw)}</td>
+                    <td className={`${td} ${c2 ? 'bg-yellow-100 font-bold' : ''}`}>{fmtNumber(r.oldRw)}{c2 ? ` → ${fmtNumber(r.newRw)}` : ''}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+        <div className="mt-3 flex items-center justify-end gap-2">
+          <button onClick={onClose} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium hover:bg-slate-100">Huỷ</button>
+          <button onClick={onConfirm} disabled={busy}
+            className="flex items-center gap-2 rounded-lg bg-emerald-600 px-5 py-2 text-sm font-bold text-white shadow-md hover:bg-emerald-700 disabled:opacity-50">
+            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />} Xác nhận kết chuyển
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ====================================================================
 // TAB 1 — BÁO CÁO TỔNG HỢP LINEN
 // ====================================================================
 function SummaryTab({ thang, summary, dailyRows, canEdit, onMonthlyChange, onMonthlySave, onPriceChange, onPriceSave, savingKey }) {
@@ -86,6 +152,35 @@ function SummaryTab({ thang, summary, dailyRows, canEdit, onMonthlyChange, onMon
   const shownRows = useMemo(() => summary.filter((r) => !isHiddenRow(r)), [summary]);
   const [exporting, setExporting] = useState(false);
   const [exportMsg, setExportMsg] = useState(null);
+  const [carry, setCarry] = useState(null); // dữ liệu xem trước kết chuyển
+  const [carryBusy, setCarryBusy] = useState(false);
+  const [carryMsg, setCarryMsg] = useState(null);
+
+  const openCarry = async () => {
+    setCarryBusy(true);
+    setCarryMsg(null);
+    try {
+      setCarry(await previewLinenCarryOver(thang));
+    } catch (err) {
+      setCarryMsg({ type: 'err', text: 'Lỗi: ' + err.message });
+    } finally {
+      setCarryBusy(false);
+    }
+  };
+  const confirmCarry = async () => {
+    setCarryBusy(true);
+    try {
+      const res = await carryOverLinenMonth(thang);
+      const [ny, nm] = res.next.split('-');
+      setCarry(null);
+      setCarryMsg({ type: 'ok', text: `Đã kết chuyển Nợ cuối kỳ sang Nợ đầu kỳ tháng ${nm}/${ny} (${res.count} loại linen). Chọn tháng ${nm}/${ny} ở góc trên để kiểm tra.` });
+    } catch (err) {
+      setCarry(null);
+      setCarryMsg({ type: 'err', text: 'Lỗi khi kết chuyển: ' + err.message });
+    } finally {
+      setCarryBusy(false);
+    }
+  };
 
   // Xuất file GIỐNG HỆT mẫu "Bảng kê chi tiết giặt ủi" (xem linenStatementExport.js)
   const handleExport = async () => {
@@ -114,10 +209,20 @@ function SummaryTab({ thang, summary, dailyRows, canEdit, onMonthlyChange, onMon
         <p className="text-xs text-slate-500">
           Nợ cuối kỳ = Nợ đầu kỳ + Giao giặt (Dơ) − Nhận về (Sạch). Cột RW = tổng RW Dơ của tháng (lấy từ bảng Rewash, không tính tiền). Số Dơ/Sạch/RW lấy tự động từ tab Nhập Liệu Daily.
         </p>
+        <div className="flex flex-wrap items-center gap-2">
+        {canEdit && (
+          <button onClick={openCarry} disabled={carryBusy}
+            className="flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white shadow hover:bg-emerald-700 disabled:opacity-50">
+            {carryBusy && !carry ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />} Kết chuyển sang tháng sau
+          </button>
+        )}
         <button onClick={handleExport} disabled={exporting} className="flex items-center gap-1 rounded bg-[#141414] px-3 py-1.5 text-xs font-bold text-white hover:bg-slate-800 disabled:opacity-50">
           {exporting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />} Xuất Bảng Kê Chi Tiết Giặt Ủi (Excel)
         </button>
+        </div>
       </div>
+      {carryMsg && <p className={`mb-2 rounded-lg px-3 py-2 text-xs font-medium ${carryMsg.type === 'ok' ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>{carryMsg.text}</p>}
+      {carry && <CarryOverModal thang={thang} preview={carry} busy={carryBusy} onConfirm={confirmCarry} onClose={() => setCarry(null)} />}
       {exportMsg && <p className="mb-2 rounded bg-amber-50 px-3 py-2 text-xs text-amber-700">{exportMsg}</p>}
 
       <div className="max-h-[calc(100vh-260px)] overflow-auto rounded border border-[#141414] bg-white">
