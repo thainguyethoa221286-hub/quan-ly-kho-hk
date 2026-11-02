@@ -292,7 +292,12 @@ export default function DashboardModule() {
         if (rolloverDone.includes(ROLLOVER_STEPS[i].key)) continue;
         setRolloverStepIdx(i);
         // eslint-disable-next-line no-await-in-loop
-        await ROLLOVER_STEPS[i].run(thang, toThang);
+        try {
+          await ROLLOVER_STEPS[i].run(thang, toThang);
+        } catch (stepErr) {
+          // phân hệ này tháng sau ĐÃ có dữ liệu (đã kết chuyển ở lần bấm trước) -> coi như xong, làm tiếp phân hệ kế tiếp
+          if (!/đã có dữ liệu/.test(stepErr.message || '')) throw new Error(`${ROLLOVER_STEPS[i].label}: ${stepErr.message}`);
+        }
         setRolloverDone((prev) => [...prev, ROLLOVER_STEPS[i].key]);
       }
       setConfirmRolloverAll(false);
