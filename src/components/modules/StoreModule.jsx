@@ -556,6 +556,7 @@ export default function StoreModule() {
                   <td className="border border-[#141414]/30 p-0">
                     <DecimalInput
                       data-field="SetUp"
+                      allowNegative
                       value={it.SetUp}
                       onChange={(e) => handleFieldChange(it.rowIndex, 'SetUp', e.target.value)}
                       onFocus={() => setFocusedRow(it.rowIndex)}
@@ -569,6 +570,7 @@ export default function StoreModule() {
                   <td className="border border-[#141414]/30 p-0">
                     <DecimalInput
                       data-field="Nhap"
+                      allowNegative
                       value={it.Nhap}
                       onChange={(e) => handleFieldChange(it.rowIndex, 'Nhap', e.target.value)}
                       onFocus={() => setFocusedRow(it.rowIndex)}
@@ -583,6 +585,7 @@ export default function StoreModule() {
                   <td className="border border-[#141414]/30 bg-yellow-100 p-0">
                     <DecimalInput
                       data-field="Ton"
+                      allowNegative
                       value={it.Ton}
                       onChange={(e) => handleFieldChange(it.rowIndex, 'Ton', e.target.value)}
                       onFocus={() => setFocusedRow(it.rowIndex)}
@@ -596,6 +599,7 @@ export default function StoreModule() {
                   <td className="border border-[#141414]/30 p-0">
                     <DecimalInput
                       data-field="Transfer"
+                      allowNegative
                       value={it.Transfer}
                       onChange={(e) => handleFieldChange(it.rowIndex, 'Transfer', e.target.value)}
                       onFocus={() => setFocusedRow(it.rowIndex)}
@@ -608,6 +612,7 @@ export default function StoreModule() {
                   <td className="border border-[#141414]/30 p-0">
                     <DecimalInput
                       data-field="HuHongMat"
+                      allowNegative
                       value={it.HuHongMat}
                       onChange={(e) => handleFieldChange(it.rowIndex, 'HuHongMat', e.target.value)}
                       onFocus={() => setFocusedRow(it.rowIndex)}
