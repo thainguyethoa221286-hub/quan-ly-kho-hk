@@ -569,7 +569,7 @@ export default function PRPOModule() {
                         onChange={(e) => handleStockMaxChange(it.rowIndex, e.target.value)}
                         onKeyDown={(e) => handleGridKeyDown(e, 'StockMax')}
                         onBlur={() => persistRow(it.rowIndex)}
-                        className="w-16 bg-transparent px-2 py-1 text-right focus:bg-yellow-300 focus:outline-none focus:ring-2 focus:ring-yellow-500"
+                        className="w-full min-w-[4rem] bg-transparent px-2 py-1 text-right focus:bg-yellow-300 focus:outline-none focus:ring-2 focus:ring-yellow-500"
                       />
                     </td>
 
@@ -583,7 +583,7 @@ export default function PRPOModule() {
                         onChange={(e) => handleFieldChange(it.rowIndex, 'GhiChu', e.target.value)}
                         onKeyDown={(e) => handleGridKeyDown(e, 'GhiChu')}
                         onBlur={() => persistRow(it.rowIndex)}
-                        className="w-32 bg-transparent px-2 py-1 focus:bg-yellow-300 focus:outline-none focus:ring-2 focus:ring-yellow-500"
+                        className="w-full min-w-[8rem] bg-transparent px-2 py-1 focus:bg-yellow-300 focus:outline-none focus:ring-2 focus:ring-yellow-500"
                       />
                     </td>
 
