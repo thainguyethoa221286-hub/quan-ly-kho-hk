@@ -152,6 +152,70 @@ function DailyBillsMatrixPreviewModal({ bills, catalog, thang, onClose, onExport
 }
 
 // ==================================================================
+// Ô chọn Item dạng xổ xuống (có ô tìm kiếm, dùng được phím ↑ ↓ Enter)
+// ==================================================================
+function ItemPicker({ catalog, pickedNames, onPick }) {
+  const [open, setOpen] = useState(false);
+  const [q, setQ] = useState('');
+  const [act, setAct] = useState(0);
+  const boxRef = React.useRef(null);
+  const searchRef = React.useRef(null);
+
+  const list = useMemo(() => {
+    const t = q.trim().toLowerCase();
+    return catalog.filter((c) => !t || c.TenHang.toLowerCase().includes(t));
+  }, [catalog, q]);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const onDown = (e) => { if (boxRef.current && !boxRef.current.contains(e.target)) setOpen(false); };
+    document.addEventListener('mousedown', onDown);
+    return () => document.removeEventListener('mousedown', onDown);
+  }, [open]);
+
+  const openIt = () => { setQ(''); setAct(0); setOpen(true); setTimeout(() => searchRef.current?.focus(), 0); };
+  const choose = (c) => { setOpen(false); onPick(c.TenHang); };
+
+  const onKey = (e) => {
+    if (e.key === 'ArrowDown') { e.preventDefault(); setAct((a) => Math.min(list.length - 1, a + 1)); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); setAct((a) => Math.max(0, a - 1)); }
+    else if (e.key === 'Enter') { e.preventDefault(); if (list[act]) choose(list[act]); }
+    else if (e.key === 'Escape') setOpen(false);
+  };
+
+  return (
+    <div className="relative" ref={boxRef}>
+      <button type="button" onClick={() => (open ? setOpen(false) : openIt())}
+        className="flex w-full items-center justify-between gap-2 rounded-lg border-2 border-dashed border-emerald-500 bg-emerald-50 px-3 py-2 text-sm font-bold text-emerald-700 hover:bg-emerald-100">
+        <span className="flex items-center gap-1.5"><Plus className="h-4 w-4" /> Thêm món khác (Pepsi, 7 UP, bia…)</span>
+        <ChevronDown className="h-4 w-4" />
+      </button>
+      {open && (
+        <div className="absolute left-0 right-0 top-full z-30 mt-1 overflow-hidden rounded-lg border border-slate-300 bg-white shadow-xl">
+          <div className="border-b border-slate-200 p-2">
+            <input ref={searchRef} value={q} onChange={(e) => { setQ(e.target.value); setAct(0); }} onKeyDown={onKey}
+              placeholder="Gõ để tìm (VD: pep, evian)…" autoComplete="off"
+              className="w-full rounded border border-slate-300 px-2 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+          </div>
+          <div className="max-h-64 overflow-y-auto">
+            {list.length === 0 ? <p className="p-3 text-center text-sm text-slate-400">Không tìm thấy item</p> : list.map((c, i) => {
+              const added = pickedNames.includes(c.TenHang);
+              return (
+                <div key={c.TenHang} onMouseDown={(e) => { e.preventDefault(); choose(c); }} onMouseEnter={() => setAct(i)}
+                  className={`flex cursor-pointer items-center justify-between border-b border-slate-100 px-3 py-2 ${i === act ? 'bg-emerald-50' : ''} ${added ? 'opacity-50' : ''}`}>
+                  <span className="text-sm">{c.TenHang}<span className="block text-[11px] text-slate-500">{fmtNumber(c.DonGia)} đ / {c.DVT}</span></span>
+                  {added && <span className="text-xs font-bold text-emerald-600">✓ đã chọn</span>}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ==================================================================
 // Ô số lượng có nút Tăng/Giảm (dùng chung cho BILL / FOC / NO POST)
 // ==================================================================
 const QTY_STEPPER_THEME = {
@@ -698,8 +762,15 @@ function DailyBillsTab({ thang, catalog, onBillsChanged, refreshToken }) {
   const [error, setError] = useState(null);
   const [phong, setPhong] = useState('');
   const [ngay, setNgay] = useState(todayISO());
-  const [nguoiBaoCao, setNguoiBaoCao] = useState('');
   const [quantities, setQuantities] = useState({});
+  // Danh sách Item đang hiện trong form. null = mặc định (chỉ có sẵn Evian — món dùng nhiều nhất)
+  const [picked, setPicked] = useState(null);
+  const defaultNames = useMemo(() => {
+    const ev = catalog.find((c) => /evian/i.test(c.TenHang));
+    return ev ? [ev.TenHang] : [];
+  }, [catalog]);
+  const shownNames = picked ?? defaultNames;
+  const shownItems = shownNames.map((n) => catalog.find((c) => c.TenHang === n)).filter(Boolean);
   const [editingBillId, setEditingBillId] = useState(null);
   const [posting, setPosting] = useState(false);
   const [fromDate, setFromDate] = useState('');
@@ -784,8 +855,21 @@ function DailyBillsTab({ thang, catalog, onBillsChanged, refreshToken }) {
     setQuantities((prev) => ({ ...prev, [tenHang]: { ...prev[tenHang], [field]: value } }));
   };
 
+  // Reset thủ công (nút Reset / Huỷ sửa): xoá form VÀ đưa Ngày về hôm nay
   const resetForm = () => {
-    setPhong(''); setNgay(todayISO()); setNguoiBaoCao(''); setQuantities({}); setEditingBillId(null);
+    setPhong(''); setNgay(todayISO()); setQuantities({}); setPicked(null); setEditingBillId(null);
+  };
+  // Sau khi Post Bill xong: xoá Phòng + Item để nhập bill kế tiếp, nhưng GIỮ NGUYÊN Ngày đã chọn
+  const clearAfterPost = () => {
+    setPhong(''); setQuantities({}); setPicked(null); setEditingBillId(null);
+  };
+  const handlePick = (tenHang) => {
+    setPicked((prev) => { const cur = prev ?? defaultNames; return cur.includes(tenHang) ? cur : [...cur, tenHang]; });
+    setTimeout(() => document.querySelector(`[data-bill-row="${CSS.escape(tenHang)}"] input`)?.focus(), 50);
+  };
+  const removePicked = (tenHang) => {
+    setPicked((prev) => (prev ?? defaultNames).filter((n) => n !== tenHang));
+    setQuantities((prev) => { const n = { ...prev }; delete n[tenHang]; return n; });
   };
 
   const handlePost = async () => {
@@ -813,12 +897,12 @@ function DailyBillsTab({ thang, catalog, onBillsChanged, refreshToken }) {
     setError(null);
     try {
       if (billItems.length > 0) {
-        await saveMinibarBill(thang, { billId: editingBillId, phong, ngay, tang: '', nguoiBaoCao, items: billItems, ghiChu: '' });
+        await saveMinibarBill(thang, { billId: editingBillId, phong, ngay, tang: '', nguoiBaoCao: '', items: billItems, ghiChu: '' });
       }
       if (noPostItems.length > 0) {
-        await saveMinibarNoPostBill(thang, { phong, ngay, tang: '', nguoiBaoCao, items: noPostItems, ghiChu: '' });
+        await saveMinibarNoPostBill(thang, { phong, ngay, tang: '', nguoiBaoCao: '', items: noPostItems, ghiChu: '' });
       }
-      resetForm();
+      clearAfterPost();
       await load();
       onBillsChanged?.(); // báo cho Bảng Báo Cáo Tổng + Danh Sách Bill No Post tự cập nhật ngầm
     } catch (err) {
@@ -832,7 +916,7 @@ function DailyBillsTab({ thang, catalog, onBillsChanged, refreshToken }) {
     setEditingBillId(bill.billId);
     setPhong(bill.phong);
     setNgay(bill.ngay);
-    setNguoiBaoCao(bill.nguoiBaoCao || '');
+    setPicked(bill.items.map((it) => it.TenHang));
     const q = {};
     bill.items.forEach((it) => { q[it.TenHang] = { bill: it.SLBill || '', foc: it.SLFOC || '' }; });
     setQuantities(q);
@@ -887,45 +971,53 @@ function DailyBillsTab({ thang, catalog, onBillsChanged, refreshToken }) {
             <div>
               <label className="mb-1 block text-xs font-semibold text-slate-600">Chọn Ngày</label>
               <input type="date" value={ngay} onChange={(e) => setNgay(e.target.value)} className="w-full rounded border border-slate-300 px-2 py-2 text-sm focus:outline-none" />
+              <p className="mt-1 text-[11px] text-slate-500">
+                {ngay === todayISO() ? <>Đang là <b className="text-emerald-600">hôm nay</b></> : <>Đang giữ ngày <b className="text-emerald-600">{ngay.split('-').reverse().join('/')}</b> (không tự nhảy về hôm nay)</>}
+              </p>
             </div>
           </div>
-          <div className="mb-3">
-            <label className="mb-1 block text-xs font-semibold text-slate-600">Người Báo Cáo</label>
-            <input value={nguoiBaoCao} onChange={(e) => setNguoiBaoCao(e.target.value)} className="w-full rounded border border-slate-300 px-2 py-2 text-sm focus:outline-none" placeholder="VD: HK Supervisor" />
-          </div>
-
           {/* Nút Post Bill đặt NGAY Ở ĐÂY (song song với "Chọn Item", NGOÀI khung cuộn danh
               sách Item bên dưới) — để luôn nhìn thấy và bấm được ngay, không cần kéo xuống
               cuối danh sách Item mới thấy nút như trước (đặc biệt bất tiện trên màn hình nhỏ). */}
           <div className="mb-2 flex items-center justify-between">
-            <p className="text-xs font-semibold text-slate-600">Chọn Item</p>
+            <p className="text-xs font-semibold text-slate-600">Chọn Item <span className="font-normal text-slate-400">— Evian có sẵn bên dưới, món khác chọn ở ô xổ xuống</span></p>
             <button onClick={handlePost} disabled={posting}
               className="flex items-center gap-1 rounded bg-red-600 px-3 py-1.5 text-xs font-extrabold text-white shadow-md shadow-red-500/40 hover:bg-red-700 disabled:opacity-50">
               {posting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />} POST BILL
             </button>
           </div>
-          <div className="max-h-[380px] space-y-2 overflow-y-auto pr-1">
-            {catalog.length === 0 ? (
-              <p className="py-6 text-center text-sm text-slate-400">Chưa có Item Minibar nào — vào tab "Bảng Báo Cáo Tổng" để thêm.</p>
-            ) : (
-              catalog.map((c) => (
-                <div key={c.TenHang} className="flex flex-wrap items-center justify-between gap-y-2 rounded border border-slate-200 p-2.5">
-                  <div className="min-w-[110px] pr-1">
-                    <p className="text-sm font-semibold text-[#141414]">{c.TenHang}</p>
-                    <p className="text-[11px] text-slate-400">{fmtNumber(c.DonGia)} đ / {c.DVT}</p>
+          {catalog.length === 0 ? (
+            <p className="py-6 text-center text-sm text-slate-400">Chưa có Item Minibar nào — vào tab "Bảng Báo Cáo Tổng" để thêm.</p>
+          ) : (
+            <>
+              <div className="mb-3">
+                <ItemPicker catalog={catalog} pickedNames={shownNames} onPick={handlePick} />
+              </div>
+              <div className="space-y-2">
+                {shownItems.length === 0 && (
+                  <p className="rounded-lg border border-dashed border-slate-300 py-5 text-center text-sm text-slate-400">Chưa có item nào — bấm "Thêm món khác" ở trên.</p>
+                )}
+                {shownItems.map((c) => (
+                  <div key={c.TenHang} data-bill-row={c.TenHang} className="flex flex-wrap items-center justify-between gap-y-2 rounded-lg border border-slate-200 p-2.5">
+                    <div className="min-w-[110px] flex-1 pr-1">
+                      <p className="text-sm font-semibold text-[#141414]">{c.TenHang}</p>
+                      <p className="text-[11px] text-slate-400">{fmtNumber(c.DonGia)} đ / {c.DVT}</p>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <QtyStepper label="BILL" theme="bill" value={quantities[c.TenHang]?.bill} onChange={(v) => setQty(c.TenHang, 'bill', v)} />
+                      <QtyStepper label="FOC" theme="foc" value={quantities[c.TenHang]?.foc} onChange={(v) => setQty(c.TenHang, 'foc', v)} />
+                      <QtyStepper label="NO POST" theme="nopost" value={quantities[c.TenHang]?.nopost} onChange={(v) => setQty(c.TenHang, 'nopost', v)} />
+                      <button type="button" onClick={() => removePicked(c.TenHang)} title="Bỏ item này"
+                        className="ml-1 flex h-6 w-6 items-center justify-center rounded-full bg-red-100 text-red-600 hover:bg-red-200"><X className="h-3.5 w-3.5" /></button>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-1.5">
-                    <QtyStepper label="BILL" theme="bill" value={quantities[c.TenHang]?.bill} onChange={(v) => setQty(c.TenHang, 'bill', v)} />
-                    <QtyStepper label="FOC" theme="foc" value={quantities[c.TenHang]?.foc} onChange={(v) => setQty(c.TenHang, 'foc', v)} />
-                    <QtyStepper label="NO POST" theme="nopost" value={quantities[c.TenHang]?.nopost} onChange={(v) => setQty(c.TenHang, 'nopost', v)} />
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
+                ))}
+              </div>
+            </>
+          )}
 
           <div className="mt-4 flex gap-2">
-            {editingBillId && <button onClick={resetForm} className="rounded border border-[#141414] px-4 py-2 text-sm font-bold">Huỷ Sửa</button>}
+            <button onClick={resetForm} title="Xoá form và đưa Ngày về hôm nay" className="flex items-center gap-1 rounded border border-[#141414] px-4 py-2 text-sm font-bold hover:bg-slate-100"><RefreshCw className="h-3.5 w-3.5" /> {editingBillId ? 'Huỷ Sửa' : 'Reset'}</button>
             <button onClick={handlePost} disabled={posting} className="flex flex-1 items-center justify-center gap-1.5 rounded bg-red-600 px-4 py-2 text-sm font-extrabold text-white shadow-md shadow-red-500/40 hover:bg-red-700 disabled:opacity-50">
               {posting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />} POST BILL
             </button>
@@ -1003,7 +1095,6 @@ function DailyBillsTab({ thang, catalog, onBillsChanged, refreshToken }) {
                               </div>
                             ))}
                           </div>
-                          <p className="mt-1 border-t border-slate-100 pt-1 text-[10px] text-slate-400">NV Báo Cáo: {b.nguoiBaoCao || '—'}</p>
                         </div>
                       );
                     })}
@@ -1133,7 +1224,6 @@ function NoPostBillsTab({ thang, onPosted }) {
                     </div>
                   ))}
                 </div>
-                <p className="mt-1 border-t border-amber-200 pt-1 text-[10px] text-slate-500">NV Báo Cáo: {b.nguoiBaoCao || '—'}</p>
                 <p className="mt-0.5 text-xs font-bold text-slate-700">Tổng (chưa thuế): {fmtNumber(total)} đ</p>
                 <div className="mt-2 flex gap-1.5">
                   <button onClick={() => handlePostNow(b)} disabled={postingId === b.billId}
