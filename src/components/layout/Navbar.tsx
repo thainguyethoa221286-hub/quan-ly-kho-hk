@@ -8,63 +8,16 @@ import { getMonthOptions, formatMonthLabel } from '../../utils/monthOptions';
 import { useConfirm } from '../common/useConfirm';
 
 // ---------- Modal nhập mật khẩu để mở Chế Độ Quản Lý ----------
-function ManagerPasswordModal({ onCancel, onConfirm }) {
-  const [password, setPassword] = useState('');
-  const [errorMsg, setErrorMsg] = useState('');
-
-  const handleSubmit = () => {
-    const ok = onConfirm(password);
-    if (!ok) setErrorMsg('Sai mật khẩu, thử lại nhé.');
-  };
-
-  return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4">
-      <div className="w-80 rounded-lg bg-white p-5 shadow-xl">
-        <div className="mb-3 flex items-center justify-between">
-          <h3 className="flex items-center gap-2 text-sm font-bold uppercase text-[#141414]">
-            <KeyRound className="h-4 w-4" /> Chế Độ Quản Lý
-          </h3>
-          <button onClick={onCancel}><X className="h-4 w-4 text-slate-400" /></button>
-        </div>
-        <p className="mb-3 text-xs text-slate-500">Nhập mật khẩu Quản lý để bật quyền chỉnh sửa dữ liệu.</p>
-        <input
-          type="password"
-          autoFocus
-          value={password}
-          onChange={(e) => { setPassword(e.target.value); setErrorMsg(''); }}
-          onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
-          placeholder="Mật khẩu Quản lý"
-          className="w-full rounded border border-slate-300 px-3 py-2 text-sm focus:outline-none"
-        />
-        {errorMsg && <p className="mt-1 text-xs text-red-500">{errorMsg}</p>}
-        <div className="mt-4 flex justify-end gap-2">
-          <button onClick={onCancel} className="rounded border border-[#141414] px-3 py-1.5 text-sm">Huỷ</button>
-          <button onClick={handleSubmit} className="rounded bg-[#141414] px-3 py-1.5 text-sm font-bold text-white">Mở Khoá</button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 export const Navbar: React.FC = () => {
   const { confirm, ConfirmDialog } = useConfirm();
   const {
     selectedMonth, setSelectedMonth,
     userProfile, setUserRole,
     toggleLockMonth, isMonthLocked,
-    isManagerMode, unlockManager, lockManagerSession, canEdit,
-    resetToDefaults
+    canEdit,
   } = useStore();
 
   const { session, signOut } = useAuth();
-  const [showPasswordModal, setShowPasswordModal] = useState(false);
-
-  const handleConfirmPassword = (password: string) => {
-    const ok = unlockManager(password);
-    if (ok) setShowPasswordModal(false);
-    return ok;
-  };
-
   return (
     <>
     <header className="bg-[#F2F1EE] border-b border-[#141414] text-[#141414] sticky top-0 z-40 shadow-sm print:hidden">
@@ -102,19 +55,8 @@ export const Navbar: React.FC = () => {
             ))}
           </select>
 
-          {/* Nút chính: Chưa mở Chế Độ Quản Lý -> yêu cầu mật khẩu */}
-          {!isManagerMode ? (
-            <button
-              onClick={() => setShowPasswordModal(true)}
-              title="Đang ở chế độ Chỉ Xem — bấm để mở Chế Độ Quản Lý"
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-mono font-bold border border-[#141414] bg-slate-500 text-white transition-all cursor-pointer hover:bg-slate-600"
-            >
-              <Eye className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">CHỈ XEM</span>
-            </button>
-          ) : (
-            <>
-              {/* Đã ở Chế Độ Quản Lý: hiện trạng thái khoá sổ THẬT của tháng đang chọn */}
+          <>
+              {/* Trạng thái khoá sổ THẬT của tháng đang chọn */}
               <button
                 onClick={() => toggleLockMonth(selectedMonth)}
                 title={isMonthLocked ? 'Nhấp để mở khoá chỉnh sửa tháng này' : 'Nhấp để khoá sổ liệu tháng này (không ai sửa được cho tới khi mở lại)'}
@@ -137,15 +79,7 @@ export const Navbar: React.FC = () => {
                 )}
               </button>
 
-              <button
-                onClick={lockManagerSession}
-                title="Thoát Chế Độ Quản Lý, quay về Chỉ Xem"
-                className="flex items-center gap-1 p-1.5 border border-[#141414] bg-white text-[#141414] hover:bg-[#E4E3E0] cursor-pointer"
-              >
-                <LogOut className="w-3.5 h-3.5" />
-              </button>
-            </>
-          )}
+          </>
         </div>
 
         {/* Right Controls: Role Switcher & Export Master Excel */}
@@ -203,31 +137,10 @@ export const Navbar: React.FC = () => {
             <span className="hidden md:inline">ĐĂNG XUẤT</span>
           </button>
 
-          {/* Reset Mock Data - chỉ Quản lý mới thấy được */}
-          {isManagerMode && (
-            <button
-              onClick={async () => {
-                if (await confirm('Bạn có chắc chắn muốn khôi phục dữ liệu mẫu ban đầu?')) {
-                  resetToDefaults();
-                }
-              }}
-              className="p-1.5 text-[#141414] hover:bg-[#E4E3E0] border border-[#141414] transition-all cursor-pointer"
-              title="Khôi phục dữ liệu mẫu ban đầu"
-            >
-              <RefreshCw className="w-4 h-4" />
-            </button>
-          )}
-
         </div>
 
       </div>
 
-      {showPasswordModal && (
-        <ManagerPasswordModal
-          onCancel={() => setShowPasswordModal(false)}
-          onConfirm={handleConfirmPassword}
-        />
-      )}
     </header>
     {ConfirmDialog}
     </>
