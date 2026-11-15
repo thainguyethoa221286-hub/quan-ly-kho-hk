@@ -12,7 +12,7 @@ export const Navbar: React.FC = () => {
   const { confirm, ConfirmDialog } = useConfirm();
   const {
     selectedMonth, setSelectedMonth,
-    userProfile, setUserRole,
+    userProfile,
     toggleLockMonth, isMonthLocked,
     canEdit,
   } = useStore();
@@ -85,45 +85,12 @@ export const Navbar: React.FC = () => {
         {/* Right Controls: Role Switcher & Export Master Excel */}
         <div className="flex items-center gap-2">
           {/* Role Switcher Dropdown */}
-          <div className="relative group">
-            <div className="flex items-center gap-2 bg-white hover:bg-[#E4E3E0] border border-[#141414] px-3 py-1.5 cursor-pointer text-xs transition-colors">
-              <UserCheck className="w-4 h-4 text-[#141414]" />
-              <div className="text-left">
-                <div className="font-bold text-[#141414]">{userProfile.name}</div>
-                <div className="text-[10px] font-mono text-slate-700">{userProfile.title.split('(')[0]}</div>
-              </div>
-            </div>
-
-            {/* Role dropdown list */}
-            <div className="absolute right-0 mt-1 w-64 bg-white border border-[#141414] shadow-xl py-2 hidden group-hover:block z-50">
-              <div className="px-3 py-1 text-[10px] font-mono font-bold uppercase text-slate-500 border-b border-[#141414] mb-1">
-                Đổi Vai Trò Thao Tác
-              </div>
-              <button
-                onClick={() => setUserRole('HK_MANAGER')}
-                className={`w-full text-left px-3 py-2 text-xs hover:bg-[#E4E3E0] flex items-center justify-between font-medium ${userProfile.role === 'HK_MANAGER' ? 'text-[#141414] font-bold bg-[#E4E3E0]' : 'text-slate-800'}`}
-              >
-                <span>Trưởng BP Buồng (HK Manager)</span>
-                <ShieldCheck className="w-3.5 h-3.5" />
-              </button>
-              <button
-                onClick={() => setUserRole('STOREKEEPER')}
-                className={`w-full text-left px-3 py-2 text-xs hover:bg-[#E4E3E0] flex items-center justify-between font-medium ${userProfile.role === 'STOREKEEPER' ? 'text-[#141414] font-bold bg-[#E4E3E0]' : 'text-slate-800'}`}
-              >
-                <span>Thủ Kho Vật Tư (Storekeeper)</span>
-              </button>
-              <button
-                onClick={() => setUserRole('HK_SUPERVISOR')}
-                className={`w-full text-left px-3 py-2 text-xs hover:bg-[#E4E3E0] flex items-center justify-between font-medium ${userProfile.role === 'HK_SUPERVISOR' ? 'text-[#141414] font-bold bg-[#E4E3E0]' : 'text-slate-800'}`}
-              >
-                <span>Giám Sát Minibar & Tầng</span>
-              </button>
-              <button
-                onClick={() => setUserRole('ACCOUNTANT')}
-                className={`w-full text-left px-3 py-2 text-xs hover:bg-[#E4E3E0] flex items-center justify-between font-medium ${userProfile.role === 'ACCOUNTANT' ? 'text-[#141414] font-bold bg-[#E4E3E0]' : 'text-slate-800'}`}
-              >
-                <span>Kế Toán Kiểm Soát (Auditor)</span>
-              </button>
+          {/* Họ tên + chức danh của tài khoản đang đăng nhập */}
+          <div className="flex items-center gap-2 bg-white border border-[#141414] px-3 py-1.5 text-xs">
+            <UserCheck className="w-4 h-4 text-[#141414]" />
+            <div className="text-left">
+              <div className="font-bold text-[#141414]">{userProfile.name}</div>
+              {userProfile.title && <div className="text-[10px] font-mono text-slate-700">{userProfile.title}</div>}
             </div>
           </div>
 
