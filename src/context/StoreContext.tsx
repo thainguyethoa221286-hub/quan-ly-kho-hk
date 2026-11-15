@@ -11,11 +11,6 @@ import {
 // ⚠️ BẢN THỬ NGHIỆM (nhánh supabase-pilot): đọc/ghi qua Supabase.
 import { getMonthLockStatus, setMonthLockStatus } from '../services/supabaseMonthLockService';
 
-// ⚠️ MẬT KHẨU CHẾ ĐỘ QUẢN LÝ — đổi trực tiếp chuỗi này nếu muốn đổi mật khẩu.
-// Ai gõ đúng mật khẩu này sẽ chuyển App sang chế độ "Quản Lý" (sửa được dữ liệu).
-// Mặc định App luôn mở ở chế độ "Chỉ Xem" cho tới khi mở khoá.
-const MANAGER_PASSWORD = 'MHOTEL2026';
-
 interface StoreContextType {
   selectedMonth: string; // e.g. "2026-07"
   setSelectedMonth: (month: string) => void;
@@ -145,24 +140,12 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const [lockedMonths, setLockedMonths] = useState<Record<string, MonthlyReportLock>>({});
 
-  // ---- Phân quyền: Chế độ Quản Lý (localStorage, tồn tại tới khi tự khoá lại) ----
-  const [isManagerMode, setIsManagerMode] = useState<boolean>(() => {
-    return localStorage.getItem('hk_manager_mode') === 'true';
-  });
-
-  const unlockManager = (password: string): boolean => {
-    if (password === MANAGER_PASSWORD) {
-      setIsManagerMode(true);
-      localStorage.setItem('hk_manager_mode', 'true');
-      return true;
-    }
-    return false;
-  };
-
-  const lockManagerSession = () => {
-    setIsManagerMode(false);
-    localStorage.removeItem('hk_manager_mode');
-  };
+  // ---- Phân quyền: đã có màn hình Đăng nhập nên KHÔNG còn mật khẩu Chế Độ Quản Lý ----
+  // Ai đăng nhập được vào App là sửa được dữ liệu (trừ tháng đã Khoá Sổ).
+  const isManagerMode = true;
+  const unlockManager = (_password?: string): boolean => true;
+  const lockManagerSession = () => {};
+  useEffect(() => { try { localStorage.removeItem('hk_manager_mode'); } catch { /* bỏ qua */ } }, []);
 
   // ---- Khoá Sổ Tháng THẬT — lưu trên Google Sheets, áp dụng cho mọi người ----
   const [isMonthLocked, setIsMonthLockedReal] = useState(false);
