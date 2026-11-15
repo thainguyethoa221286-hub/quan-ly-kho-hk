@@ -96,7 +96,7 @@ export const Navbar: React.FC = () => {
 
           {/* Đăng xuất tài khoản (khác nút thoát Chế Độ Quản Lý ở bên trái) */}
           <button
-            onClick={async () => { if (await confirm('Đăng xuất khỏi hệ thống?')) signOut(); }}
+            onClick={async () => { if (await confirm('Bạn muốn thoát khỏi hệ thống?', { title: 'Đăng xuất', okText: 'Đồng ý', danger: false })) signOut(); }}
             className="flex items-center gap-1.5 border border-[#141414] bg-white px-2.5 py-1.5 text-xs font-bold text-[#141414] transition-all hover:bg-[#FF4444] hover:text-white cursor-pointer"
             title={session?.user?.email ? `Đang đăng nhập: ${emailToId(session.user.email)}` : 'Đăng xuất'}
           >
