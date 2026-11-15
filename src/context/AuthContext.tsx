@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from '../services/supabaseClient';
 
@@ -91,5 +91,52 @@ export const AuthGate: React.FC<{ login: React.ReactNode; children: React.ReactN
       </div>
     );
   }
-  return <>{session ? children : login}</>;
+  return <>{session ? <>{children}<IdleGuard /></> : login}</>;
 };
+
+// ---- Tự đăng xuất sau 30 phút không thao tác (báo trước 60 giây, bấm "Tiếp tục" để ở lại) ----
+const IDLE_MS = 30 * 60 * 1000;
+const WARN_MS = 60 * 1000;
+
+function IdleGuard() {
+  const { signOut } = useAuth();
+  const lastRef = useRef(Date.now());
+  const warnRef = useRef(false);
+  const [left, setLeft] = useState<number | null>(null); // số giây còn lại khi đang cảnh báo
+
+  useEffect(() => {
+    const bump = () => { if (!warnRef.current) lastRef.current = Date.now(); };
+    const events = ['mousemove', 'mousedown', 'keydown', 'scroll', 'touchstart', 'wheel'];
+    events.forEach((e) => window.addEventListener(e, bump, { passive: true }));
+    const tick = () => {
+      const idle = Date.now() - lastRef.current;
+      if (idle >= IDLE_MS) { signOut(); return; }
+      if (idle >= IDLE_MS - WARN_MS) { warnRef.current = true; setLeft(Math.ceil((IDLE_MS - idle) / 1000)); }
+      else { warnRef.current = false; setLeft(null); }
+    };
+    const timer = setInterval(tick, 1000);
+    document.addEventListener('visibilitychange', tick);
+    return () => {
+      events.forEach((e) => window.removeEventListener(e, bump));
+      clearInterval(timer);
+      document.removeEventListener('visibilitychange', tick);
+    };
+  }, [signOut]);
+
+  if (left === null) return null;
+  return (
+    <div className="fixed inset-0 z-[400] flex items-center justify-center bg-black/50 p-4">
+      <div className="w-full max-w-sm rounded-lg bg-white p-5 text-center shadow-2xl">
+        <h3 className="mb-2 text-base font-bold text-[#141414]">Bạn còn đang làm việc không?</h3>
+        <p className="mb-4 text-sm text-slate-600">Đã lâu không thao tác. Hệ thống sẽ tự đăng xuất sau <b className="text-red-600">{left}</b> giây để bảo mật.</p>
+        <button
+          autoFocus
+          onClick={() => { lastRef.current = Date.now(); warnRef.current = false; setLeft(null); }}
+          className="w-full rounded bg-emerald-600 py-2 text-sm font-bold text-white hover:bg-emerald-700"
+        >
+          Tiếp tục làm việc
+        </button>
+      </div>
+    </div>
+  );
+}
