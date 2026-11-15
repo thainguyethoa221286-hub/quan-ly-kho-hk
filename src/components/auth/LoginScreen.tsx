@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Eye, EyeOff, Loader2, Lock, Mail, ShieldCheck, BedDouble, Wine, Shirt, Package } from 'lucide-react';
+import { Eye, EyeOff, Loader2, Lock, User, ShieldCheck, BedDouble, Wine, Shirt, Package } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
 const MAX_TRIES = 5;
@@ -25,7 +25,7 @@ export default function LoginScreen() {
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (busy || wait > 0) return;
-    if (!email.trim() || !password) { setError('Vui lòng nhập email và mật khẩu.'); return; }
+    if (!email.trim() || !password) { setError('Vui lòng nhập ID và mật khẩu.'); return; }
     setBusy(true);
     setError(null);
     const err = await signIn(email, password);
@@ -73,11 +73,11 @@ export default function LoginScreen() {
           <h2 className="text-2xl font-black">Đăng nhập</h2>
           <p className="mb-6 mt-1 text-sm text-slate-600">Dành cho nhân viên được cấp tài khoản.</p>
 
-          <label className="mb-1 block text-xs font-bold uppercase tracking-wide text-slate-600" htmlFor="login-email">Email</label>
+          <label className="mb-1 block text-xs font-bold uppercase tracking-wide text-slate-600" htmlFor="login-email">ID đăng nhập</label>
           <div className="relative mb-4">
-            <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-            <input id="login-email" type="email" name="email" autoComplete="username" autoFocus value={email}
-              onChange={(e) => setEmail(e.target.value)} placeholder="ten@mhotel.vn"
+            <User className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <input id="login-email" type="text" name="username" autoComplete="username" autoCapitalize="none" autoCorrect="off" spellCheck={false} autoFocus value={email}
+              onChange={(e) => setEmail(e.target.value.replace(/\s/g, ''))} placeholder="VD: hoa.hk"
               className="w-full rounded border border-[#141414] bg-white py-3 pl-10 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" />
           </div>
 
@@ -101,7 +101,7 @@ export default function LoginScreen() {
             {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />} {busy ? 'Đang đăng nhập…' : 'Đăng nhập'}
           </button>
 
-          <p className="mt-6 text-center text-xs text-slate-500">Quên mật khẩu hoặc cần tài khoản mới? Liên hệ Trưởng bộ phận Buồng Phòng.</p>
+          <p className="mt-6 text-center text-xs text-slate-500">Quên ID/mật khẩu hoặc cần tài khoản mới? Liên hệ Trưởng bộ phận Buồng Phòng.</p>
         </form>
       </div>
     </div>
