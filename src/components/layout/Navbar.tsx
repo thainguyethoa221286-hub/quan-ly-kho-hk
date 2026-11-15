@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useStore } from '../../context/StoreContext';
+import { useAuth } from '../../context/AuthContext';
 import {
   Building2, Calendar, Lock, Unlock, RefreshCw, UserCheck, ShieldCheck, Eye, KeyRound, X, LogOut
 } from 'lucide-react';
@@ -55,6 +56,7 @@ export const Navbar: React.FC = () => {
     resetToDefaults
   } = useStore();
 
+  const { session, signOut } = useAuth();
   const [showPasswordModal, setShowPasswordModal] = useState(false);
 
   const handleConfirmPassword = (password: string) => {
@@ -190,6 +192,16 @@ export const Navbar: React.FC = () => {
               </button>
             </div>
           </div>
+
+          {/* Đăng xuất tài khoản (khác nút thoát Chế Độ Quản Lý ở bên trái) */}
+          <button
+            onClick={async () => { if (await confirm('Đăng xuất khỏi hệ thống?')) signOut(); }}
+            className="flex items-center gap-1.5 border border-[#141414] bg-white px-2.5 py-1.5 text-xs font-bold text-[#141414] transition-all hover:bg-[#FF4444] hover:text-white cursor-pointer"
+            title={session?.user?.email ? `Đang đăng nhập: ${session.user.email}` : 'Đăng xuất'}
+          >
+            <LogOut className="w-3.5 h-3.5" />
+            <span className="hidden md:inline">ĐĂNG XUẤT</span>
+          </button>
 
           {/* Reset Mock Data - chỉ Quản lý mới thấy được */}
           {isManagerMode && (
