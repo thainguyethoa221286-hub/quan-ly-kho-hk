@@ -9,6 +9,7 @@ import {
   INITIAL_VPP_ITEMS, INITIAL_DAILY_BILLS 
 } from '../data/mockData';
 // ⚠️ BẢN THỬ NGHIỆM (nhánh supabase-pilot): đọc/ghi qua Supabase.
+import { useAuth, emailToId } from './AuthContext';
 import { getMonthLockStatus, setMonthLockStatus } from '../services/supabaseMonthLockService';
 
 interface StoreContextType {
@@ -72,12 +73,14 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [hasConfirmedMonth, setHasConfirmedMonth] = useState<boolean>(false);
   const confirmMonth = () => setHasConfirmedMonth(true);
   
-  const [userProfile, setUserProfile] = useState<UserProfile>({
-    name: 'Thái Nguyệt Hoa',
+  // Họ tên + chức danh lấy theo TÀI KHOẢN đang đăng nhập (bảng nhan_vien), không còn chọn tay
+  const { session: authSession, profile: staffProfile } = useAuth();
+  const userProfile: UserProfile = {
+    name: staffProfile?.hoTen || emailToId(authSession?.user?.email) || 'Người dùng',
     role: 'HK_MANAGER',
-    title: 'Trưởng Bộ Phận Buồng Phòng (HK Manager)',
+    title: staffProfile?.chucDanh || '',
     department: 'Housekeeping & Store Dept'
-  });
+  };
 
   const [storeItems, setStoreItems] = useState<StoreItem[]>(() => {
     const saved = localStorage.getItem('hk_store_items');
@@ -246,22 +249,8 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     });
   }, [dailyBills]);
 
-  // Handle User Role Change
-  const setUserRole = (role: Role) => {
-    const titles: Record<Role, { title: string; dept: string }> = {
-      HK_MANAGER: { title: 'Trưởng Bộ Phận Buồng Phòng (HK Manager)', dept: 'Management Dept' },
-      STOREKEEPER: { title: 'Thủ Kho Vật Tư (Storekeeper)', dept: 'HK Store Warehouse' },
-      HK_SUPERVISOR: { title: 'Giám Sát Buồng (HK Supervisor)', dept: 'Floor Operations' },
-      ACCOUNTANT: { title: 'Kế Toán Kiểm Soát (Auditor)', dept: 'Finance & Accounting' }
-    };
-
-    setUserProfile({
-      name: role === 'HK_MANAGER' ? 'Thái Nguyệt Hoa' : role === 'STOREKEEPER' ? 'Hồ Phạm Minh Châu' : role === 'HK_SUPERVISOR' ? 'HK SUP' : 'Giám sát',
-      role,
-      title: titles[role].title,
-      department: titles[role].dept
-    });
-  };
+  // Vai trò không còn đổi tay được — hiển thị theo tài khoản đăng nhập
+  const setUserRole = (_role: Role) => {};
 
   // Module 01 Actions
   const addStoreItem = (item: Omit<StoreItem, 'id' | 'lossAndDamageQty'>) => {
