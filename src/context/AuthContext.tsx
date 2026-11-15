@@ -13,8 +13,12 @@ export const idToEmail = (id: string) => {
 };
 export const emailToId = (email?: string | null) => (email || '').replace(`@${ID_DOMAIN}`, '');
 
+/** Họ tên + chức danh của người đang đăng nhập (lấy từ bảng nhan_vien trong Supabase) */
+export interface StaffProfile { hoTen: string; chucDanh: string }
+
 interface AuthContextType {
   session: Session | null;
+  profile: StaffProfile | null;
   loading: boolean;
   signIn: (id: string, password: string) => Promise<string | null>; // trả về thông báo lỗi (null = thành công)
   signOut: () => Promise<void>;
@@ -34,6 +38,7 @@ function viError(message: string): string {
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const [profile, setProfile] = useState<StaffProfile | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -46,6 +51,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => { alive = false; sub.subscription.unsubscribe(); };
   }, []);
 
+  // Mỗi lần đăng nhập: đọc họ tên + chức danh của chính tài khoản đó (không có bảng/không có dòng -> chỉ hiện ID)
+  const email = session?.user?.email;
+  useEffect(() => {
+    if (!email) { setProfile(null); return undefined; }
+    let alive = true;
+    supabase.from('nhan_vien').select('ho_ten, chuc_danh').eq('id', emailToId(email)).maybeSingle()
+      .then(({ data }) => { if (alive) setProfile(data ? { hoTen: data.ho_ten || '', chucDanh: data.chuc_danh || '' } : null); });
+    return () => { alive = false; };
+  }, [email]);
+
   const signIn = async (id: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({ email: idToEmail(id), password });
     return error ? viError(error.message) : null;
@@ -57,7 +72,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     window.location.reload();
   };
 
-  return <AuthContext.Provider value={{ session, loading, signIn, signOut }}>{children}</AuthContext.Provider>;
+  return <AuthContext.Provider value={{ session, profile, loading, signIn, signOut }}>{children}</AuthContext.Provider>;
 };
 
 export function useAuth() {
